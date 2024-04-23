@@ -52,7 +52,8 @@ train(
     model=model,
     optimizer=optimizer,
     loss_function=torch.nn.MSELoss(),
-    device=device
+    device=device,
+    num_epochs_per_fold=101
 )
 #################
 
