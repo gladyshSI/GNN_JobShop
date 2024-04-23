@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+from precedence_graph import PGAlgorithms
 from schedule import Schedule, SchAlgorithms
 
 
@@ -42,3 +43,16 @@ def rand_f_geom(lb, ub):
     p = lb + np.random.geometric(0.6) - 1
     p = min(ub, p)
     return p
+
+
+# list to dict transformation
+def get_colors_from_output(output):
+    colors = dict()
+    for i, feats in enumerate(output):
+        colors[i] = feats[0]
+    return colors
+
+
+def get_longest_ps_dict(pg):
+    pga = PGAlgorithms(pg)
+    return pga.get_longest_passes()

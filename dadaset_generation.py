@@ -90,10 +90,10 @@ def generate_graph(v_num=50, ds_min=None, ds_max=None, seed=1, startstart_num_di
 
 
 # Dictionary from task_id to list of available resources
-def generate_t_to_res():
+def generate_t_to_res(precedence_gr):
     res = [0, 1, 2, 3, 4, 5]
     t_to_res = dict()
-    for t in range(len(pg._vertices)):
+    for t in range(len(precedence_gr._vertices)):
         t_to_res[t] = res
     return t_to_res
 
@@ -116,7 +116,7 @@ if __name__ == '__main__':
         pg.read_from_file(path_to_the_graph)
 
     # Create map from task_id to list of available resources
-    t_to_res = generate_t_to_res()
+    t_to_res = generate_t_to_res(precedence_gr=pg)
 
     if CASE == 1:
         data_list = gen_DList_1gr(pg=pg,
