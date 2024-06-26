@@ -1,16 +1,18 @@
 import numpy as np
 
-from dadaset_generation import generate_graph, generate_t_to_res
-from jobShop_optimization import cplex_optimize
+from dadaset_generation import generate_graph, generate_complete_t_to_res
+from DiscreteOpt.cplex_models import cplex_simple, cplex_pg_time_lags_max
 from schedule import SchAlgorithms, print_schedule
-from utilities import get_longest_ps_dict, get_avg_deltas, rand_f_geom
+from utilities import get_avg_deltas, rand_f_geom
+from DiscreteOpt.run_opt_models import get_longest_ps_dict
 
 pg = generate_graph()
-t_to_res = generate_t_to_res(pg)
+v_num = len(pg._vertices)
+t_to_res = generate_complete_t_to_res(v_num, 6)
 longest_ps_dict = get_longest_ps_dict(pg)
 longest_ps_list = [longest_ps_dict[i] for i in range(len(pg._vertices))]
 
-gap, sch_cplex = cplex_optimize(pg, t_to_res, 6, longest_ps_list, 100, log_output=True)
+gap, sch_cplex = cplex_pg_time_lags_max(pg, t_to_res, 6, longest_ps_list, 100, log_output=True)
 print("GAP =", gap)
 
 scha_cplex = SchAlgorithms(sch_cplex)

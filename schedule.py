@@ -107,6 +107,22 @@ class Schedule:
                 first_tasks.append(t)
         return first_tasks
 
+    def get_last_tasks(self):
+        last_tasks = []
+        for t in self._reverse_edges.keys():
+            if t not in self._edges.keys():
+                last_tasks.append(t)
+        return last_tasks
+
+    def get_makespan(self):
+        makespan = 0
+        last_tasks = self.get_last_tasks()
+        for t in last_tasks:
+            st = self._rev_sch[t][1]
+            et = st + self._pg._vertices[t]._duration
+            makespan = max(makespan, et)
+        return makespan
+
     def to_pandas(self):
         df = pd.DataFrame(columns=['Task', 'Start', 'Finish', 'Resource'])
         for r, task_sch in self._schedule.items():

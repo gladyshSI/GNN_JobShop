@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch_geometric.data import Data
 
-from dadaset_generation import generate_graph, generate_t_to_res, get_features_from_sch, get_answ_f_geom_mean
+from dadaset_generation import generate_graph, generate_complete_t_to_res, get_features_from_sch, get_answ_f_geom_mean
 from models import ResTransformer
 from schedule import Schedule, SchAlgorithms, print_schedule
 from train import train
@@ -17,7 +17,8 @@ model.to(device)
 
 # Test graph and schedule creation
 pg = generate_graph()
-t_to_res = generate_t_to_res(pg)
+v_num = len(pg._vertices)
+t_to_res = generate_complete_t_to_res(v_num, 6)
 
 # Before training:
 sch_valid1 = Schedule(pg, t_to_res)

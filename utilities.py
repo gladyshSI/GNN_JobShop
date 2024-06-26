@@ -1,8 +1,4 @@
 import numpy as np
-import torch
-
-from precedence_graph import PGAlgorithms
-from schedule import Schedule, SchAlgorithms
 
 
 # Calculate new task durations n times from rand_f distribution
@@ -51,8 +47,3 @@ def get_colors_from_output(output):
     for i, feats in enumerate(output):
         colors[i] = feats[0]
     return colors
-
-
-def get_longest_ps_dict(pg):
-    pga = PGAlgorithms(pg)
-    return pga.get_longest_passes()

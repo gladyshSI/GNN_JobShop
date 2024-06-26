@@ -68,8 +68,8 @@ def train(data_list, model, optimizer, loss_function, device, num_folds=1, num_e
             if epoch % 100 == 0:
                 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(15, 6))
 
-                ax[0].plot(epochs, test_r2, label='% test r2')
-                ax[0].plot(epochs, train_r2, label='% train r2')
+                ax[0].plot(epochs, test_r2, label='test r2')
+                ax[0].plot(epochs, train_r2, label='train r2')
                 ax[0].legend(loc='best')
                 ax[1].plot(epochs, test_loss_mean2, label='test mean2')
                 ax[1].plot(epochs, train_loss_mean2, label='train mean2')

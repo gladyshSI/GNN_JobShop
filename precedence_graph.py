@@ -81,11 +81,13 @@ class PrecedenceGraph:
                       if i not in self._edges.keys()]
         for fr_id in no_out_ids:
             predss = self.get_all_predecessors(fr_id)
-            forbiden_set = set()
+            forbidden_set = set()
             for pred_id in predss:
-                forbiden_set.update(self._edges[pred_id])
+                forbidden_set.update(self._edges[pred_id])
 
-            to_id_set = [i for i in range(fr_id + 1, dummy_end_id) if i not in forbiden_set]
+            to_id_set = [i for i in range(fr_id + 1, dummy_end_id) if i not in forbidden_set]
+            if len(to_id_set) == 0:
+                to_id_set = [dummy_end_id]
             to_id = random.choice(to_id_set)
             self._edges[fr_id] = [to_id]
             self._reverse_edges[to_id].append(fr_id)
