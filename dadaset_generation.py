@@ -82,10 +82,10 @@ def gen_DList_1gr(pg, t_to_res, get_answ_f, _len, path_to_file):
     return data_list
 
 
-def generate_graph(v_num=50, ds_min=None, ds_max=None, seed=1, startstart_num_diap=(2, 4), end_num_diap=(2, 4)):
+def generate_graph(v_num=50, ds_min=None, ds_max=None, seed=1, start_num_diap=(2, 4), end_num_diap=(2, 4)):
     pg = PrecedenceGraph()
     pg.random_v(v_num=v_num, ds_min=ds_min, ds_max=ds_max, seed=seed)
-    pg.random_network(start_num_diap=startstart_num_diap, end_num_diap=end_num_diap, seed=seed)
+    pg.random_network(start_num_diap=start_num_diap, end_num_diap=end_num_diap, seed=seed)
     return pg
 
 
