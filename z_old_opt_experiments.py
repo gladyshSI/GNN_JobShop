@@ -4,9 +4,9 @@ from matplotlib import pyplot as plt
 from DiscreteOpt.run_opt_models import run_cp_simp, get_metrics, run_qp_simp, run_cp_precedence_max, \
     run_milp_simp, run_milp_weights, run_qp_weights, run_cp_weights, run_cp_transitions, run_milp_durations, \
     run_qp_durations, add_metrics_to_file
-from dadaset_generation import generate_graph, generate_complete_t_to_res
-from precedence_graph import PrecedenceGraph
-from schedule import SchAlgorithms, print_schedule
+from z_old_dadaset_generation import generate_graph, generate_complete_t_to_res
+from class_graph import PrecedenceGraph
+from class_schedule import SchAlgorithms, print_schedule
 from utilities import get_avg_deltas, rand_f_geom
 
 CREATE_GRAPHS = False

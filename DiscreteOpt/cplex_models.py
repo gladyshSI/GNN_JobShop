@@ -1,61 +1,59 @@
 import numpy as np
 from docplex.cp.model import *
 
-from schedule import Schedule, SchAlgorithms, print_schedule
+from class_problem import Problem
+from class_schedule import Schedule, SchAlgorithms, print_schedule
 from utilities import rand_f_geom, get_avg_deltas
 
 
-def make_schedule_from_cplex_simple(pg, t_to_res, r_num, msol, rik):
-    sch = Schedule(pg, t_to_res)
+def make_schedule_from_cplex_simple(problem: Problem, msol, rik) -> Schedule:
+    sch = Schedule(problem)
     starting_times = dict()  # task_id -> st
     chosen_resources = dict()  # task_id -> res
-    for i in range(len(pg._vertices)):
-        for k in range(r_num):
+    for i in problem.get_all_ids():
+        for k in range(problem.get_machines_num()):
             var_sol = msol.get_var_solution(rik[(i, k)])
             if var_sol.is_present():
                 starting_times[i] = var_sol.get_start()
                 chosen_resources[i] = k
 
-    tasks = sorted(list(range(len(pg._vertices))), key=lambda x: starting_times[x])
-    for t in tasks:
+    for t in problem.get_all_ids():
         sch.schedule_task(chosen_resources[t], t, starting_times[t])
-
     return sch
 
 
-def make_schedule_from_cplex_stochastic(pg, t_to_res, r_num, msol, r_iks, fr_scenario=0):
-    sch = Schedule(pg, t_to_res)
+def make_schedule_from_cplex_stochastic(problem: Problem, msol, r_iks, fr_scenario=0) -> Schedule:
+    sch = Schedule(problem)
     starting_times = dict()  # task_id -> st
     chosen_resources = dict()  # task_id -> res
-    for i in range(len(pg._vertices)):
-        for k in range(r_num):
+    for i in problem.get_all_ids():
+        for k in range(problem.get_machines_num()):
             var_sol = msol.get_var_solution(r_iks[(i, k, fr_scenario)])
             if var_sol.is_present():
                 starting_times[i] = var_sol.get_start()
                 chosen_resources[i] = k
 
-    tasks = sorted(list(range(len(pg._vertices))), key=lambda x: starting_times[x])
-    for t in tasks:
+    for t in problem.get_all_ids():
         sch.schedule_task(chosen_resources[t], t, starting_times[t])
 
     return sch
 
 
-def cplex_simple(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True):
-    task_num = len(pg._vertices)
-    tasks = list(range(task_num))
-    last_task = task_num - 1
-    resources = list(range(r_num))
+def cplex_simple(problem: Problem, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+    tasks = list(problem.get_all_ids())
+    task_num = len(tasks)
+    last_task = next(iter(problem.get_end_ids()))
+    resources = list(range(problem.get_machines_num()))
 
     edge_list = []
-    for i, js in pg._edges.items():
+    for i, js in problem.get_copy_of_all_edges().items():
         for j in js:
             edge_list.append((i, j))
 
     if p == None:
         p = []
         for v in range(task_num):
-            p.append(pg.get_duration(v))
+            p.append(problem.get_duration(v))
 
     # MODEL
     mdl = CpoModel()
@@ -92,24 +90,24 @@ def cplex_simple(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, tim
     msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
-    return gap, make_schedule_from_cplex_simple(pg, t_to_res, r_num, msol, rik)
+    return make_schedule_from_cplex_simple(problem, msol, rik), gap
 
 
-def cplex_pg_time_lags_max(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True):
-    task_num = len(pg._vertices)
-    tasks = list(range(task_num))
-    last_task = task_num - 1
-    resources = list(range(r_num))
+def cplex_pg_time_lags_max(problem: Problem, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+    tasks = list(problem.get_all_ids())
+    task_num = len(tasks)
+    last_task = next(iter(problem.get_end_ids()))
+    resources = list(range(problem.get_machines_num()))
 
     edge_list = []
-    for i, js in pg._edges.items():
+    for i, js in problem.get_copy_of_all_edges().items():
         for j in js:
             edge_list.append((i, j))
 
     if p == None:
         p = []
         for v in range(task_num):
-            p.append(pg.get_duration(v))
+            p.append(problem.get_duration(v))
 
     # MODEL
     mdl = CpoModel()
@@ -172,28 +170,28 @@ def cplex_pg_time_lags_max(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p
     gap = msol.get_objective_gap()
 
     # print("makespan =", msol.get_objective_values()[0])
-    return gap, make_schedule_from_cplex_simple(pg, t_to_res, r_num, msol, rik)
+    return make_schedule_from_cplex_simple(problem, msol, rik), gap
 
 
-def cplex_weights(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True):
-    task_num = len(pg._vertices)
-    tasks = list(range(task_num))
-    last_task = task_num - 1
-    resources = list(range(r_num))
+def cplex_weights(problem: Problem, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+    tasks = list(problem.get_all_ids())
+    task_num = len(tasks)
+    last_task = next(iter(problem.get_end_ids()))
+    resources = list(range(problem.get_machines_num()))
 
     edge_list = []
-    for i, js in pg._edges.items():
+    for i, js in problem.get_copy_of_all_edges().items():
         for j in js:
             edge_list.append((i, j))
 
     if p == None:
         p = []
         for v in range(task_num):
-            p.append(pg.get_duration(v))
+            p.append(problem.get_duration(v))
 
     # CREATE WEIGHTS AND COEFFICIENT
-    weights = [1. / pi for pi in p]
-    c = makespan * task_num
+    # Safe jobs first
+    weights = [1. / len(problem.get_task_distribution(t_id)) for t_id in tasks]
 
     # MODEL
     mdl = CpoModel()
@@ -231,31 +229,141 @@ def cplex_weights(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, ti
     msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
-    return gap, make_schedule_from_cplex_simple(pg, t_to_res, r_num, msol, rik)
+    return make_schedule_from_cplex_simple(problem, msol, rik), gap
 
 
-def cplex_buffer_times(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True):
-    task_num = len(pg._vertices)
-    tasks = list(range(task_num))
-    last_task = task_num - 1
-    resources = list(range(r_num))
+def cplex_buffer_times(problem: Problem, buffers: dict[int, int], rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+    tasks = list(problem.get_all_ids())
+    last_task = next(iter(problem.get_end_ids()))
+    resources = list(range(problem.get_machines_num()))
 
     edge_list = []
-    for i, js in pg._edges.items():
+    for i, js in problem.get_copy_of_all_edges().items():
         for j in js:
             edge_list.append((i, j))
 
     if p == None:
         p = []
-        for v in range(task_num):
-            p.append(pg.get_duration(v))
+        for v in tasks:
+            p.append(problem.get_duration(v) + buffers[v])
+
+        # MODEL
+        mdl = CpoModel()
+
+        # VARIABLES:
+        xi = {}
+        rik = {}
+        for i in tasks:
+            p_i = p[i]
+            est_i = rl_passes_list[i][0]
+            lst_i = makespan - rl_passes_list[i][1] + 1
+            xi[i] = mdl.interval_var(start=[est_i, lst_i + p_i], size=p_i)
+            for k in resources:
+                rik[(i, k)] = mdl.interval_var(optional=True)
+
+        # CONSTRAINTS:
+        # end before start:
+        for i, j in edge_list:
+            mdl.add(mdl.end_before_start(xi[i], xi[j]))
+
+        # alternative:
+        for i in tasks:
+            mdl.add(mdl.alternative(xi[i], [rik[(i, k)] for k in resources]))
+
+        # no overlap:
+        for k in resources:
+            mdl.add(mdl.no_overlap([rik[(i, k)] for i in tasks]))
+
+        # OBJECTIVE:
+        # original:
+        mdl.add(mdl.minimize(mdl.end_of(xi[last_task])))
+
+        # Solve the model
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+        gap = msol.get_objective_gap()
+
+    return make_schedule_from_cplex_simple(problem, msol, rik), gap
+
+
+def cplex_multimode_buffer_times(problem: Problem, buffers: dict[int, int], rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+    tasks = list(problem.get_all_ids())
+    last_task = next(iter(problem.get_end_ids()))
+    resources = list(range(problem.get_machines_num()))
+
+    edge_list = []
+    for i, js in problem.get_copy_of_all_edges().items():
+        for j in js:
+            edge_list.append((i, j))
+
+    if p == None:
+        p = []
+        for v in tasks:
+            p.append(problem.get_duration(v) + buffers[v])
+
+        # MODEL
+        mdl = CpoModel()
+
+        # VARIABLES:
+        xim = {}  # modes
+        xi = {}
+        rik = {}
+        for i in tasks:
+            p_i = p[i]
+            est_i = rl_passes_list[i][0]
+            lst_i = makespan - rl_passes_list[i][1] + 1
+            for m in range(1, 4):
+                xim[(i, m)] = mdl.interval_var(start=[est_i, lst_i + p_i+m], size=p_i+m, optional=True)
+            for k in resources:
+                rik[(i, k)] = mdl.interval_var(optional=True)
+            xi[i] = mdl.interval_var()
+
+        # CONSTRAINTS:
+        # alternative:
+        for i in tasks:
+            mdl.add(mdl.alternative(xi[i], [xim[(i, m)] for m in range(1, 4)]))
+            mdl.add(mdl.alternative(xi[i], [rik[(i, k)] for k in resources]))
+
+        # end before start:
+        for i, j in edge_list:
+            mdl.add(mdl.end_before_start(xi[i], xi[j]))
+
+        # no overlap:
+        for k in resources:
+            mdl.add(mdl.no_overlap([rik[(i, k)] for i in tasks]))
+
+        # OBJECTIVE:
+        # original:
+        mdl.add(mdl.minimize(mdl.end_of(xi[last_task])))
+
+        # Solve the model
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+        gap = msol.get_objective_gap()
+
+    return make_schedule_from_cplex_simple(problem, msol, rik), gap
+
+
+def cplex_transitions(problem: Problem,
+                      transitions: dict[int, dict[int, int]],
+                      rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+    tasks = list(problem.get_all_ids())
+    last_task = next(iter(problem.get_end_ids()))
+    resources = list(range(problem.get_machines_num()))
+
+    edge_list = []
+    for i, js in problem.get_copy_of_all_edges().items():
+        for j in js:
+            edge_list.append((i, j))
+
+    if p == None:
+        p = []
+        for v in tasks:
+            p.append(problem.get_duration(v))
 
     # TODO: fix hardcode
-    transition_times = transition_matrix(11)
-    for i in [3, 4, 5, 6, 7, 8, 9, 10]:
-        tr = np.max([0, 5 - i])
-        for j in [3, 4, 5, 6, 7, 8, 9, 10]:
-            transition_times.set_value(i, j, tr)
+    transition_times = transition_matrix(len(tasks))
+    for i, ts in transitions.items():
+        for j, transit_time in ts.items():
+            transition_times.set_value(i, j, transit_time)
 
     # MODEL
     mdl = CpoModel()
@@ -272,7 +380,7 @@ def cplex_buffer_times(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=Non
             rik[(i, k)] = mdl.interval_var(optional=True)
     # sequence variables:
     seq_k = {k: mdl.sequence_var([rik[(i, k)] for i in tasks],
-                                 types=[p[i] for i in tasks], name="resource_" + str(k))
+                                 types=[i for i in tasks], name="resource_" + str(k))
              for k in resources}
 
     # CONSTRAINTS:
@@ -296,74 +404,7 @@ def cplex_buffer_times(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=Non
     msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
-    return gap, make_schedule_from_cplex_simple(pg, t_to_res, r_num, msol, rik)
-
-
-def cplex_transitions(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True):
-    task_num = len(pg._vertices)
-    tasks = list(range(task_num))
-    last_task = task_num - 1
-    resources = list(range(r_num))
-
-    edge_list = []
-    for i, js in pg._edges.items():
-        for j in js:
-            edge_list.append((i, j))
-
-    if p == None:
-        p = []
-        for v in range(task_num):
-            p.append(pg.get_duration(v))
-
-    # TODO: fix hardcode
-    transition_times = transition_matrix(11)
-    for i in [3, 4, 5, 6, 7, 8, 9, 10]:
-        for j in [3, 4, 5, 6, 7, 8, 9, 10]:
-            tr = 0
-            if i <= 5:
-                tr = np.max([0, 10 - i - j])
-            transition_times.set_value(i, j, tr)
-
-    # MODEL
-    mdl = CpoModel()
-
-    # VARIABLES:
-    xi = {}
-    rik = {}
-    for i in tasks:
-        p_i = p[i]
-        est_i = rl_passes_list[i][0]
-        lst_i = makespan - rl_passes_list[i][1] + 1
-        xi[i] = mdl.interval_var(start=[est_i, lst_i + p_i], size=p_i)
-        for k in resources:
-            rik[(i, k)] = mdl.interval_var(optional=True)
-    # sequence variables:
-    seq_k = {k: mdl.sequence_var([rik[(i, k)] for i in tasks],
-                                 types=[p[i] for i in tasks], name="resource_" + str(k))
-             for k in resources}
-
-    # CONSTRAINTS:
-    # end before start:
-    for i, j in edge_list:
-        mdl.add(mdl.end_before_start(xi[i], xi[j]))
-
-    # alternative:
-    for i in tasks:
-        mdl.add(mdl.alternative(xi[i], [rik[(i, k)] for k in resources]))
-
-    # no overlap:
-    for k in resources:
-        mdl.add(mdl.no_overlap(seq_k[k], transition_times))
-
-    # OBJECTIVE:
-    # original:
-    mdl.add(mdl.minimize(mdl.end_of(xi[last_task])))
-
-    # Solve the model
-    msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
-    gap = msol.get_objective_gap()
-
-    return gap, make_schedule_from_cplex_simple(pg, t_to_res, r_num, msol, rik)
+    return make_schedule_from_cplex_simple(problem, msol, rik), gap
 
 
 def cplex_combined_trans_pc_max(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, time_limit=2,
@@ -450,27 +491,25 @@ def cplex_combined_trans_pc_max(pg, t_to_res, r_num, rl_passes_list, makespan=10
     return gap, make_schedule_from_cplex_simple(pg, t_to_res, r_num, msol, rik)
 
 
-def cplex_stochastic(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True):
-    task_num = len(pg._vertices)
-    tasks = list(range(task_num))
-    last_task = task_num - 1
-    resources = list(range(r_num))
+def cplex_stochastic(problem: Problem, rl_passes_list, makespan=1000, scenarios_num=200, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+    tasks = list(problem.get_all_ids())
+    last_task = next(iter(problem.get_end_ids()))
+    resources = list(range(problem.get_machines_num()))
 
     edge_list = []
-    for i, js in pg._edges.items():
+    for i, js in problem.get_copy_of_all_edges().items():
         for j in js:
             edge_list.append((i, j))
 
     if p == None:
         p = []
-        for v in range(task_num):
-            p.append(pg.get_duration(v))
+        for v in tasks:
+            p.append(problem.get_duration(v))
 
-    # TODO: fix hardcode
-    scenarios_num = 200
     scenarios = [p]
     for _ in range(scenarios_num - 1):
-        ps = [rand_f_geom(lb, ub) for (lb, ub) in [(v._d_min, v._d_max) for v in pg._vertices]]
+        new_durations = problem.get_random_durations_from_distributions()
+        ps = [new_durations[i] for i in tasks]
         scenarios.append(ps)
 
     # MODEL
@@ -528,30 +567,28 @@ def cplex_stochastic(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None,
     msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
-    return gap, make_schedule_from_cplex_stochastic(pg, t_to_res, r_num, msol, r_iks, fr_scenario=0)
+    return make_schedule_from_cplex_stochastic(problem, msol, r_iks, fr_scenario=0), gap
 
 
-def cplex_stochastic_avg_delta(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True):
-    task_num = len(pg._vertices)
-    tasks = list(range(task_num))
-    last_task = task_num - 1
-    resources = list(range(r_num))
+def cplex_stochastic_avg_delta(problem: Problem, rl_passes_list, makespan=1000, scenarios_num=200, p=None, time_limit=2, log_output=True):
+    tasks = list(problem.get_all_ids())
+    last_task = next(iter(problem.get_end_ids()))
+    resources = list(range(problem.get_machines_num()))
 
     edge_list = []
-    for i, js in pg._edges.items():
+    for i, js in problem.get_copy_of_all_edges().items():
         for j in js:
             edge_list.append((i, j))
 
     if p == None:
         p = []
-        for v in range(task_num):
-            p.append(pg.get_duration(v))
+        for v in tasks:
+            p.append(problem.get_duration(v))
 
-    # TODO: fix hardcode
-    scenarios_num = 200
     scenarios = [p]
     for _ in range(scenarios_num - 1):
-        ps = [rand_f_geom(lb, ub) for (lb, ub) in [(v._d_min, v._d_max) for v in pg._vertices]]
+        new_durations = problem.get_random_durations_from_distributions()
+        ps = [new_durations[i] for i in tasks]
         scenarios.append(ps)
 
     # MODEL
@@ -610,30 +647,28 @@ def cplex_stochastic_avg_delta(pg, t_to_res, r_num, rl_passes_list, makespan=100
     msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
-    return gap, make_schedule_from_cplex_stochastic(pg, t_to_res, r_num, msol, r_iks, fr_scenario=0)
+    return make_schedule_from_cplex_stochastic(problem, msol, r_iks, fr_scenario=0), gap
 
 
-def cplex_stochastic_max_delta(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True):
-    task_num = len(pg._vertices)
-    tasks = list(range(task_num))
-    last_task = task_num - 1
-    resources = list(range(r_num))
+def cplex_stochastic_max_delta(problem: Problem, rl_passes_list, makespan=1000, scenarios_num=200, p=None, time_limit=2, log_output=True):
+    tasks = list(problem.get_all_ids())
+    last_task = next(iter(problem.get_end_ids()))
+    resources = list(range(problem.get_machines_num()))
 
     edge_list = []
-    for i, js in pg._edges.items():
+    for i, js in problem.get_copy_of_all_edges().items():
         for j in js:
             edge_list.append((i, j))
 
     if p == None:
         p = []
-        for v in range(task_num):
-            p.append(pg.get_duration(v))
+        for v in tasks:
+            p.append(problem.get_duration(v))
 
-    # TODO: fix hardcode
-    scenarios_num = 200
     scenarios = [p]
     for _ in range(scenarios_num - 1):
-        ps = [rand_f_geom(lb, ub) for (lb, ub) in [(v._d_min, v._d_max) for v in pg._vertices]]
+        new_durations = problem.get_random_durations_from_distributions()
+        ps = [new_durations[i] for i in tasks]
         scenarios.append(ps)
 
     # MODEL
@@ -692,4 +727,4 @@ def cplex_stochastic_max_delta(pg, t_to_res, r_num, rl_passes_list, makespan=100
     msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
-    return gap, make_schedule_from_cplex_stochastic(pg, t_to_res, r_num, msol, r_iks, fr_scenario=0)
+    return make_schedule_from_cplex_stochastic(problem, msol, r_iks, fr_scenario=0), gap

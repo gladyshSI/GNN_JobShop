@@ -1,7 +1,7 @@
 import gurobipy as gp
 from gurobipy import GRB
 
-from schedule import Schedule
+from class_schedule import Schedule
 from Keys.gurobi_keys import GUROBI_OPTIONS
 
 

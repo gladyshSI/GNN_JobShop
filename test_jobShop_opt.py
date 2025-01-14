@@ -1,8 +1,8 @@
 import numpy as np
 
-from dadaset_generation import generate_graph, generate_complete_t_to_res
+from z_old_dadaset_generation import generate_graph, generate_complete_t_to_res
 from DiscreteOpt.cplex_models import cplex_simple, cplex_pg_time_lags_max
-from schedule import SchAlgorithms, print_schedule
+from class_schedule import SchAlgorithms, print_schedule
 from utilities import get_avg_deltas, rand_f_geom
 from DiscreteOpt.run_opt_models import get_longest_ps_dict
 

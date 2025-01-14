@@ -1,4 +1,4 @@
-from precedence_graph import PrecedenceGraph, PGAlgorithms, print_networkx_graph
+from class_graph import PrecedenceGraph, PGAlgorithms, print_networkx_graph
 
 # Create Precedence Graph with 50 vertices
 pg = PrecedenceGraph()
@@ -8,7 +8,7 @@ pg.random_network(start_num_diap=(2, 4), end_num_diap=(2, 4), seed=1)
 # Create algorithms class for this graph
 pga = PGAlgorithms(pg)
 ranks = pga.ranking()
-print("rank to vertices:\n", pga.get_rank_to_vs(ranks))
+print("rank to vertices:\n", get_rank_to_vs(ranks))
 
 # Print statistics and draw precedence graph
 print(pga.get_statistics())

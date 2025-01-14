@@ -3,8 +3,8 @@ import torch
 import tqdm
 from torch_geometric.data import Data
 
-from precedence_graph import PrecedenceGraph
-from schedule import Schedule, SchAlgorithms
+from class_graph import PrecedenceGraph
+from class_schedule import Schedule, SchAlgorithms
 from utilities import get_avg_deltas, rand_f_geom
 
 

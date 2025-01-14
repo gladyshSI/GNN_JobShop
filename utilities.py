@@ -1,19 +1,21 @@
 import numpy as np
 
+from class_schedule import Schedule
 
-# Calculate new task durations n times from rand_f distribution
+
+# Calculate new task durations n times from task's distribution
 # Calculate overlaps
 # Take agg_f of the overlaps for each node
-def get_avg_deltas(scha, n, rand_f=lambda lb, ub: np.random.randint(lb, ub + 1), agg_f=lambda x: np.mean(x)):
+def get_avg_deltas(schedule: Schedule, num_of_repeats: int, agg_f=lambda x: np.mean(x)):
     deltas = dict()
-    vertices = scha._sch._pg._vertices
-    for i in range(n):
+    vertices = schedule.get_task_ids()
+    for i in range(num_of_repeats):
         new_durations = dict()
         for t in range(len(vertices)):
             lb = vertices[t]._d_min
             ub = vertices[t]._d_max
             new_durations[t] = rand_f(lb, ub)
-        deltas_i = scha.calc_deltas(new_durations)
+        deltas_i = schedule.calc_deltas(new_durations)
         for t, d in deltas_i.items():
             if t not in deltas.keys():
                 deltas[t] = []

@@ -2,9 +2,9 @@ import numpy as np
 import torch
 from torch_geometric.data import Data
 
-from dadaset_generation import generate_graph, generate_complete_t_to_res, get_features_from_sch, get_answ_f_geom_mean
+from z_old_dadaset_generation import generate_graph, generate_complete_t_to_res, get_features_from_sch, get_answ_f_geom_mean
 from models import ResTransformer
-from schedule import Schedule, SchAlgorithms, print_schedule
+from class_schedule import Schedule, SchAlgorithms, print_schedule
 from train import train
 from utilities import get_colors_from_output, get_avg_deltas, rand_f_geom
 

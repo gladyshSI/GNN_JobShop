@@ -1,7 +1,7 @@
 import numpy as np
 
-from precedence_graph import PrecedenceGraph
-from schedule import Schedule, print_schedule, SchAlgorithms
+from class_graph import PrecedenceGraph
+from class_schedule import Schedule, print_schedule, SchAlgorithms
 
 # Create Precedence Graph with 50 vertices
 pg = PrecedenceGraph()

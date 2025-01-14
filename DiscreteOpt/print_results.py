@@ -84,4 +84,4 @@ if __name__ == '__main__':
             'max_delta',
             'gap',
             'last_delta']
-    draw_comparing_boxplot(all_metrics, keys, labels, draw_problem_id=0, filename='../Output/comparing_boxplot.png')
+    # draw_comparing_boxplot(all_metrics, keys, labels, draw_problem_id=0, filename='../Output/comparing_boxplot.png')
