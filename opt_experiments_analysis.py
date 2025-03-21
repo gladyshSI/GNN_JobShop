@@ -288,13 +288,13 @@ if __name__ == '__main__':
     elif MODE == 2:
         # RADAR CHART
         labels = [
-            'cp_simp',
-            # 'cp_stochastic',
+            # 'cp_simp',
+            'cp_stochastic',
             # 'cp_stochastic_avg_delta',
             # 'cp_stochastic_max_delta',
-            'cp_weights',
-            # 'cp_buffer_times',
-            # 'cp_transitions'
+            # 'cp_weights',
+            'cp_buffer_times',
+            'cp_transitions'
         ]
 
         experiments = [(50, 'uniform'), (50, 'normal'), (50, 'exponential')]
@@ -307,13 +307,15 @@ if __name__ == '__main__':
             all_metrics_list_dif_exp.append(all_metrics_one_exp)
 
         labels_to_print_radar = [
-            'baseline',
-            # 'stoch. RM',
+            # 'baseline',
+            'stoch. RM',
             # 'stoch. SM1',
             # 'stoch. SM2',
-            'SJF',
-            # 'buffers',
-            # 'transitions'
+            # 'SJF',
+            'buffers',
+            'transitions'
         ]
         title = "Average models' rank"
         make_radar_charts(all_metrics_list_dif_exp, labels_to_print_radar, experiments, title)
+    else:
+        print(f'Invalid MODE: {MODE}')

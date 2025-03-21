@@ -29,9 +29,9 @@ y_dict = get_answ_f_geom_mean(scha)
 y_list = torch.tensor([[y_dict[t._id]] for t in sch_valid1._pg._vertices])
 
 d = Data(
-    x=node_fs.type(torch.float32),
+    x=node_fs.d_type(torch.float32),
     edge_index=edge_idx,
-    edge_attr=edge_fs.type(torch.float32),
+    edge_attr=edge_fs.d_type(torch.float32),
     y=y_list.type(torch.float32)
 )
 d.to(device)

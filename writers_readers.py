@@ -18,7 +18,9 @@ def read_graph(path_to_file: str) -> PrecedenceGraph:
     with open(path_to_file, 'r') as f:
         for line in f:
             fr_id, to_ids = line.split(':')
-            for to_id in to_ids.split(',')[:-1]:
+            if to_ids[-2:] == ',\n':
+                to_ids = to_ids[:-2]
+            for to_id in to_ids.split(','):
                 graph.add_edge(int(fr_id), int(to_id))
     return graph
 

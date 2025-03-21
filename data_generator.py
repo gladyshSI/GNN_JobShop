@@ -57,6 +57,6 @@ if __name__ == '__main__':
     distribution_types = ['uniform', 'normal', 'exponential']
     for distribution_type in distribution_types:
         folder = "Data/Tasks/" + distribution_type
-        generate_random_tasks(butch_size=100, num_tasks=52, distribution_type=distribution_type, folder=folder)
-        generate_random_tasks(butch_size=100, num_tasks=102, distribution_type=distribution_type, folder=folder)
-        generate_random_tasks(butch_size=100, num_tasks=202, distribution_type=distribution_type, folder=folder)
+        generate_random_tasks(butch_size=100, num_tasks=62, distribution_type=distribution_type, folder=folder)
+        # generate_random_tasks(butch_size=100, num_tasks=102, distribution_type=distribution_type, folder=folder)
+        # generate_random_tasks(butch_size=100, num_tasks=202, distribution_type=distribution_type, folder=folder)
