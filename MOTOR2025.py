@@ -1,3 +1,5 @@
+import time
+
 from docplex.cp.model import *
 import copy
 import numpy as np
@@ -5,6 +7,7 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 from math import sqrt
 from graphlib import TopologicalSorter
+from collections import deque
 
 from writers_readers import read_graph
 
@@ -50,23 +53,28 @@ def bubble_sort_heuristic(init_durs, weights, task_durs, init_execution_order):
     return objs
 
 
-def draw_bubble_sort_heur_results(objs_for_experiments: list[list[float]], title='Heuristic Bubble Sort'):
+def draw_bubble_sort_heur_results(objs_for_experiments: list[list[float]], type: str, title='Heuristic Bubble Sort'):
     experiments_num = len(objs_for_experiments)
     xss = [range(len(objs_for_experiments[i])) for i in range(experiments_num)]
 
     # Plot each list on the same graph
     for i in range(experiments_num):
-        plt.plot(xss[i], objs_for_experiments[i], label=f'Problem {i + 1}')
+        plt.plot(xss[i], objs_for_experiments[i], color='black', linewidth=1.)  # , label=f'Задача {i + 1}')
 
     # Add labels and legend
-    plt.xlabel('Num of swaps in bubble sort')
-    plt.ylabel('Average expected start time deviation')
+    # plt.xlabel('Num of swaps in bubble sort')
+    # plt.xlabel('Число перестановок при сортировке пузырьком')
+    plt.xlabel('t')
+    # plt.ylabel('Average expected start time deviation')
+    # plt.ylabel('Среднее ожидаемое отклонение стартов работ')
+    plt.ylabel('Q')  # (r'$\frac{1}{n}\sum_{j=1}^n E(\delta_j)$')
     plt.title(title)
-    plt.legend()
+    # plt.legend()
+    plt.savefig(f'./Output/plots/MOTORexp1_{type}.svg')
     plt.show()
 
 
-def draw_boxplot_for_heuristic_comp(file, title):
+def draw_boxplot_for_heuristic_comp(file, d_type, title):
     with open(file, 'r') as f:
         lines = f.readlines()
     heuristic_objs = []
@@ -76,9 +84,11 @@ def draw_boxplot_for_heuristic_comp(file, title):
         cplex_objs.append(float(line.split(':')[3]))
     heuristic_d = [heuristic_objs[i] - min(heuristic_objs[i], cplex_objs[i]) for i in range(len(heuristic_objs))]
     cplex_d = [cplex_objs[i] - min(heuristic_objs[i], cplex_objs[i]) for i in range(len(cplex_objs))]
-    plt.boxplot([heuristic_d, cplex_d], labels=['Heuristic', 'CPLEX'])
-    plt.ylabel('Obj. function deviation from the best result')
+    plt.boxplot([heuristic_d, cplex_d], labels=['Algorithm 1', 'Algorithm 2'])
+    # plt.ylabel('Отклонение целевой функции от лучшего результата')
+    plt.ylabel(r'$\Delta_{\rm{obj}}$')
     plt.title(title)
+    plt.savefig(f'./Output/plots/MOTORexp2_{d_type}.svg')
     plt.show()
 
 
@@ -132,6 +142,9 @@ def stoch_cplex_model(tasks_num: int,
     for s in range(1, scenarios_num):
         mdl.add(mdl.same_sequence(seq_s[0], seq_s[s]))
 
+    # without idle times:
+    mdl.add(mdl.end_of(x_is[(last_task_id, 0)]) == np.sum(initial_durations))
+
     # OBJECTIVE:
     obj_s = {}
     for s in range(scenarios_num):
@@ -140,8 +153,9 @@ def stoch_cplex_model(tasks_num: int,
         obj_s[s] = sum_delta
     agg_obj = mdl.sum([obj_s[s] for s in range(scenarios_num)])
 
-    mdl.add(mdl.minimize_static_lex([mdl.end_of(x_is[(last_task_id, 0)]),
-                                     agg_obj]))
+    mdl.add(mdl.minimize(agg_obj))
+    # mdl.add(mdl.minimize_static_lex([mdl.end_of(x_is[(last_task_id, 0)]),
+    #                                  agg_obj]))
 
     # Solve the model
     msol = mdl.solve(TimeLimit=time_limit, log_output=True)
@@ -198,23 +212,57 @@ def weighted_topological_sort(tasks_num: int, edge_dict: dict, weights: np.array
     return order
 
 
+def greedy_heuristic(tasks_num: int, edge_dict: dict, weights: np.array):
+    edge_dict_copy = copy.deepcopy(edge_dict)
+    all_suc_dict = dict()
+    for i in range(tasks_num):
+        all_suc_dict[i] = get_all_successors(edge_dict_copy, i)
+
+    scheduled = []
+    d = deque()
+    for i in range(tasks_num):
+        wi = weights[i]
+        best_value, best_position = np.sum([1 if weights[j] >= wi else -1 for j in scheduled]), 0
+        value, position = best_value, best_position
+        for di in d:
+            position += 1
+            if i in all_suc_dict.keys() and di in all_suc_dict[i]:
+                break
+            if di in all_suc_dict.keys() and i in all_suc_dict[di]:
+                best_position = position
+            value += -1 if weights[di] >= wi else 1
+            if value > best_value:
+                best_value, best_position = value, position
+        d.insert(best_position, i)
+        scheduled.append(i)
+    # print(d)
+    return list(d)
+
+
 def generate_durations(tasks_num: int, size: int, pi, di, d_type: str):
+    for i in range(tasks_num):
+        if di[i] < 0 or pi[i] < 0:
+            raise ValueError("pi and di must be positive")
+
     if d_type == 'uniform':
         durations = [np.random.uniform(low=pi[i]-sqrt(6*di[i]), high=pi[i]+sqrt(6*di[i]), size=size) for i in tqdm(range(tasks_num))]
     elif d_type == 'normal':
         durations = [np.maximum(pi[i] - 4, np.minimum(pi[i] + 4, np.random.normal(pi[i], di[i], size))) for i in tqdm(range(tasks_num))]
+    elif d_type == '3discrete':
+        for dii in di:
+            if dii > 0.5:
+                raise ValueError('di should be between 0 and 0.5 for 3discrete distribution')
+        durations = [np.random.choice([pi[i]-1, pi[i], pi[i]+1], size, p=[di[i], 1-2*di[i], di[i]]) for i in tqdm(range(tasks_num))]
     else:
         raise ValueError(f'Type {d_type} not supported')
     return durations
 
 
-def first_experiment():
+def exp_bubblesort(type: str):
     size = 10 ** 6
     N = 20
     experiments_num = 10
     objs_for_experiments = []
-    # type = 'uniform'
-    type = 'normal'
     for _ in range(experiments_num):
         print('Experiment', _, 'out of ', experiments_num)
         pi = np.random.uniform(5, 10, N)
@@ -223,39 +271,43 @@ def first_experiment():
         initial_seq = [i for i in range(N)]
         objs = bubble_sort_heuristic(pi, di, tasks, initial_seq)
         objs_for_experiments.append(objs)
-    draw_bubble_sort_heur_results(objs_for_experiments, f'Problems with {type}ly distributed durations')
+    title = ''  # 'Равномерно распределенные продолжительности работ' if type == 'uniform' else 'Нормально распределенные продолжительности работ'
+    draw_bubble_sort_heur_results(objs_for_experiments, type, title)
 
 
-def second_experiment(d_type: str):
+def exp_heuristic_vs_cp(d_type: str):
     size = 10 ** 6
     NOT_DUMMY_V_NUM = 50
-    PROBLEMS_NUM = 30
-    TIME_LIMIT = 900
+    PROBLEMS_NUM = 50
+    TIME_LIMIT = 120
     SCENARIOS_NUM = 60
     GRAPH_DIR = './Data/PrecedenceGraphs/FasterGeneratedGraphs/'
 
-    output_dir = f'./Output/opt_experiment_metrics/MOTOR2025_Output_{d_type}.txt'
+    output_dir = f'./Output/opt_experiment_metrics/MOTOR2025exp2_Output_{d_type}.txt'
     open(output_dir, 'w').close()
 
-    # EXPERIMENT
     graph_paths = [GRAPH_DIR + f'{NOT_DUMMY_V_NUM}_notDummyVertices/graph_{NOT_DUMMY_V_NUM + 2}_{i}.txt'
                    for i in range(PROBLEMS_NUM)]
-    metrics_map = dict()
+
     for problem_id in range(PROBLEMS_NUM):
         graph = read_graph(graph_paths[problem_id])
         edges = graph.get_copy_of_all_edges()
-        # print(f'edges: {edges}')
 
-        pi = np.random.uniform(5, 10, NOT_DUMMY_V_NUM + 2)
-        di = np.random.uniform(0, 1.5, NOT_DUMMY_V_NUM + 2)
-        # print(f'di: {di}')
+        if d_type == 'uniform' or d_type == 'normal':
+            pi = np.random.uniform(5, 10, NOT_DUMMY_V_NUM + 2)
+            di = np.random.uniform(0, 1.5, NOT_DUMMY_V_NUM + 2)
+        else:
+            pi = np.random.choice(range(3, 10), NOT_DUMMY_V_NUM+2)
+            di = np.random.uniform(0, 0.5, NOT_DUMMY_V_NUM + 2)
 
         tasks = generate_durations(NOT_DUMMY_V_NUM + 2, size, pi, di, d_type)
+        # print(pi, di, tasks)
 
-        heur_seq = weighted_topological_sort(NOT_DUMMY_V_NUM + 2, edges, di)
+        heur_seq = greedy_heuristic(NOT_DUMMY_V_NUM + 2, edges, di)
         print(f'heur_seq: {heur_seq}')
+        scale = 1 if d_type == '3discrete' else 10**4
         cplex_seq, gap = stoch_cplex_model(NOT_DUMMY_V_NUM + 2, NOT_DUMMY_V_NUM + 1, edges, pi, tasks, TIME_LIMIT,
-                                           SCENARIOS_NUM, 10 ** 4)
+                                           SCENARIOS_NUM, scale=scale)
         print(f'cplex_seq: {cplex_seq}')
 
         heur_obj = np.average(calculate_overlaps(init_durations=pi, task_durations=tasks, execution_order=heur_seq))
@@ -265,15 +317,63 @@ def second_experiment(d_type: str):
         with open(output_dir, 'a') as f:
             f.write(f'{problem_id}: Heuristic: {heur_obj}, CPLEX: {cplex_obj}' + '\n')
 
-    draw_boxplot_for_heuristic_comp(output_dir,
-                                    f'{PROBLEMS_NUM} problems with {NOT_DUMMY_V_NUM + 2} vertices in each, {d_type}ly distributed durations')
+    title = ''
+    draw_boxplot_for_heuristic_comp(output_dir, d_type, title)
+
+
+def calculate_next_overlaps(dist_l, dist_r):
+    dist = {}
+    for kl, vl in dist_l.items():
+        for kr, vr in dist_r.items():
+            k = max([0, max([0, kl]) + kr])
+            v = vl * vr
+            if k not in dist.keys():
+                dist[k] = 0
+            dist[k] += v
+    return dist
+
+
+def calculate_overlaps_discrete_case(distributions, seq):
+    overlaps = [{0: 1.}, calculate_next_overlaps({0: 1}, distributions[seq[0]])]
+    for i in range(len(seq) - 1):
+        next_overlaps = calculate_next_overlaps(distributions[seq[i]], distributions[seq[i + 1]])
+        overlaps.append(next_overlaps)
+    return overlaps
+
+
+def calculate_expected_overlap(overlaps: dict):
+    expected_overlap = 0
+    for k, v in overlaps.items():
+        expected_overlap += v*k
+    return expected_overlap
+
+
+def exp_discrete_case():
+    num_tasks = 5
+    distributions = [{-1: i/(3 * num_tasks), 0: 1 - 2 * i/(3 * num_tasks), 1: i/(3 * num_tasks)} for i in range(1, num_tasks + 1)]
+    print(f'distributions: {distributions}')
+    seqs = [[0, 1, 2, 3, 4], [1, 0, 2, 3, 4], [1, 2, 0, 3, 4], [2, 1, 0, 3, 4]]
+    for seq in seqs:
+        print(f'seq: {seq}')
+        overlaps = calculate_overlaps_discrete_case(distributions, seq)
+        print(f'Overlaps: {overlaps}')
+        print(f'last overlaps: {overlaps[-1]}')
+        print(f'expected last overlaps: {calculate_expected_overlap(overlaps[-1])}')
+        sum_overlaps = 0.
+        for overlap in overlaps:
+            sum_overlaps += calculate_expected_overlap(overlap)
+        print(f'sum expected overlaps: {sum_overlaps}')
 
 
 if __name__ == '__main__':
-    # first_experiment()
-    d_types = ['uniform', 'normal']
+    d_types = ['uniform', 'normal'] #  +['3discrete']
     for d_type in d_types:
-        second_experiment(d_type)
+        # exp_bubblesort(d_type)
+        # exp_heuristic_vs_cp(d_type)
+        output_dir = f'./Output/opt_experiment_metrics/MOTOR/MOTOR2025_Output_{d_type}.txt'
+        draw_boxplot_for_heuristic_comp(output_dir, d_type, '')
+
+
 
 
 

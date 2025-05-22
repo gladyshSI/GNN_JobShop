@@ -21,9 +21,10 @@ from writers_readers import read_graph, read_tasks_to_dict
 
 def make_experiment(problem_to_solve: Problem,
                     runner: Callable[[Problem, int, dict], tuple[Schedule, float, float]],
+                    time_limit: int,
                     parameters: dict) -> tuple[Schedule, dict]:
     # TODO: Add parameters to all runners
-    schedule, gap, time = runner(problem_to_solve, TIME_LIMIT, parameters)
+    schedule, gap, time = runner(problem_to_solve, time_limit, parameters)
     m = get_metrics(schedule)
     m['gap'] = gap
     m['time'] = time
@@ -35,18 +36,8 @@ def print_sch_with_deltas(schedule: Schedule):
     print_schedule(schedule, {i: mean_of_distribution(exact_overlap_dist[i]) for i in exact_overlap_dist.keys()})
 
 
-if __name__ == "__main__":
-    NOT_DUMMY_V_NUM = 60  # 50
-    DISTRIBUTION_TYPE = 'normal'
-    MACHINES_NUM = 5  # 6
-
-    PROBLEMS_NUM = 1
-    TIME_LIMIT = 30
-    # GRAPH_DIR = './Data/PrecedenceGraphs/FasterGeneratedGraphs/'
-    GRAPH_DIR = './Data/PrecedenceGraphs/parsedPSPLib/'
-    TASKS_DIR = './Data/Tasks/'
-    OUTPUT_DIR = './Output/opt_experiment_metrics/'
-
+def run_experiment(NOT_DUMMY_V_NUM: int, DISTRIBUTION_TYPE: str, MACHINES_NUM: int, PROBLEMS_NUM: int, TIME_LIMIT: int,
+                   GRAPH_DIR: str, TASKS_DIR: str, experiments: np.array):
     # EXPERIMENTS:
     # graph_paths = [GRAPH_DIR + f'{NOT_DUMMY_V_NUM}_notDummyVertices/graph_{NOT_DUMMY_V_NUM + 2}_{i}.txt'
     #                for i in range(PROBLEMS_NUM)]
@@ -55,37 +46,10 @@ if __name__ == "__main__":
     tasks_paths = [TASKS_DIR + f'{DISTRIBUTION_TYPE}/tasks_{DISTRIBUTION_TYPE}_{NOT_DUMMY_V_NUM + 2}_{i}.txt'
                    for i in range(PROBLEMS_NUM)]
 
-    # [name, runner, output_postfix, parameters]
-    experiments = np.array([
-        # {'name': 'milp_simp', 'runner': run_milp_simp},
-        # {'name': 'qp_simp', 'runner': run_qp_simp},
-        {'name': 'DET', 'runner': run_cp_simp},
-
-        # {'name': 'milp_weights', 'runner': run_milp_weights},
-        # {'name': 'qp_weights', 'runner': run_qp_weights},
-        # {'name': 'cp_weights', 'runner': run_cp_weights},
-        #
-        # {'name': 'milp_durations', 'runner': run_milp_durations},
-        # {'name': 'qp_durations', 'runner': run_qp_durations},
-        # {'name': 'BT10', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.1}},
-        {'name': 'BT40', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.4}},
-        {'name': 'TR40', 'runner': run_cp_transitions, 'params': {'threshold': 0.4}},
-        {'name': 'STrm', 'runner': run_cp_stochastic, 'params': {'N': 50}},
-        {'name': 'STavg', 'runner': run_cp_stochastic_avg_delta, 'params': {'N': 50}},
-        {'name': 'STmax', 'runner': run_cp_stochastic_max_delta, 'params': {'N': 50}},
-        {'name': 'MB4', 'runner': run_cp_stochastic_avg_d_makespan_bound, 'params': {'N': 50, 'makespan_delta': 4, 'first_runner': run_cp_simp, 'first_runner_params': {}, 'first_time_limit': 20}},
-        #
-        # {'name': 'cp_precedence_max', 'runner': run_cp_precedence_max},
-        # {'name': 'cp_combined', 'runner': run_cp_combined},
-        {'name': 'MMbuf', 'runner': run_cp_stochastic_multi_mode_buf, 'params': {'N': 50, 'max_buf_size': 4*MACHINES_NUM}},
-
-        # {'name': 'SGS_Rand', 'runner': run_sgs_rand},
-        # {'name': 'SGS_SJF', 'runner': run_sgs_sjf},
-        # {'name': 'SGS_SJL', 'runner': run_sgs_sjl},
-    ])
-
     # Clean files with metrics:
-    output_files = {experiment['name']: OUTPUT_DIR + f'metrics_{experiment['name']}.txt' for experiment in experiments}
+    output_files = {experiment[
+                        'name']: OUTPUT_DIR + f'{NOT_DUMMY_V_NUM}_{DISTRIBUTION_TYPE}_{MACHINES_NUM}_{experiment['name']}.txt'
+                    for experiment in experiments}
     for i in range(len(experiments)):
         name = experiments[i]['name']
         open(output_files[name], 'w').close()
@@ -101,7 +65,7 @@ if __name__ == "__main__":
         for experiment in experiments:
             print(f'#######\nName: {experiment['name']} \ngraph_f = {graph_file}\ntasks_file = {tasks_file}\n#######')
             parameters = {} if 'params' not in experiment else experiment['params']
-            schedule, metrics = make_experiment(problem_to_solve=problem, runner=experiment['runner'],
+            schedule, metrics = make_experiment(problem_to_solve=problem, runner=experiment['runner'], time_limit=TIME_LIMIT,
                                                 parameters=parameters)
 
             experiment_name = experiment['name']
@@ -139,3 +103,100 @@ if __name__ == "__main__":
     all_metrics = [metrics_map[name] for name in experiment_names]  # 2D array (row: list of metrics for one model)
     labels = experiment_names
     make_box_plot(all_metrics, labels, problem_id)
+
+
+if __name__ == "__main__":
+    NOT_DUMMY_V_NUM = 60  # 50
+    MACHINES_NUM = 5  # 6
+    PROBLEMS_NUM = 50
+    TIME_LIMIT = 60
+    # GRAPH_DIR = './Data/PrecedenceGraphs/FasterGeneratedGraphs/'
+    GRAPH_DIR = './Data/PrecedenceGraphs/parsedPSPLib/'
+    TASKS_DIR = './Data/Tasks/'
+    OUTPUT_DIR = './Output/opt_experiment_metrics/'
+
+    # [name, runner, output_postfix, parameters]
+    experiments = np.array([
+        # {'name': 'milp_simp', 'runner': run_milp_simp},
+        # {'name': 'qp_simp', 'runner': run_qp_simp},
+        {'name': 'DET', 'runner': run_cp_simp},
+
+        # {'name': 'milp_weights', 'runner': run_milp_weights},
+        # {'name': 'qp_weights', 'runner': run_qp_weights},
+        # {'name': 'cp_weights', 'runner': run_cp_weights},
+        #
+        # {'name': 'milp_durations', 'runner': run_milp_durations},
+        # {'name': 'qp_durations', 'runner': run_qp_durations},
+
+        # {'name': 'STrm2', 'runner': run_cp_stochastic, 'params': {'N': 2, 'obj': 'avg_rm'}},
+        # {'name': 'STrm10', 'runner': run_cp_stochastic, 'params': {'N': 10, 'obj': 'avg_rm'}},
+        {'name': 'STrm30', 'runner': run_cp_stochastic, 'params': {'N': 30, 'obj': 'avg_rm'}},
+        # {'name': 'STrm50', 'runner': run_cp_stochastic, 'params': {'N': 50, 'obj': 'avg_rm'}},
+        # {'name': 'STrm100', 'runner': run_cp_stochastic, 'params': {'N': 100, 'obj': 'avg_rm'}},
+        # {'name': 'STrm150', 'runner': run_cp_stochastic, 'params': {'N': 150, 'obj': 'avg_rm'}},
+
+        # {'name': 'STrm', 'runner': run_cp_stochastic, 'params': {'N': 50, 'obj': 'avg_rm'}},
+        # {'name': 'STsm1', 'runner': run_cp_stochastic, 'params': {'N': 50, 'obj': 'avg_exp_ovp'}},
+        # {'name': 'STsm2', 'runner': run_cp_stochastic, 'params': {'N': 50, 'obj': 'max_exp_ovp'}},
+        # {'name': 'STmaxRm', 'runner': run_cp_stochastic, 'params': {'N': 50, 'obj': 'max_rm'}},
+        # {'name': 'STmaxSm', 'runner': run_cp_stochastic, 'params': {'N': 50, 'obj': 'max_max_ovp'}},
+
+        # {'name': 'BT10', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.1}},
+        # {'name': 'BT20', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.2}},
+        # {'name': 'BT30', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.3}},
+        {'name': 'BT25', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.25}},
+        # {'name': 'BT40', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.4}},
+
+        # {'name': 'TR30', 'runner': run_cp_transitions, 'params': {'threshold': 0.3}},
+        {'name': 'TR35', 'runner': run_cp_transitions, 'params': {'threshold': 0.35}},
+        # {'name': 'TR50', 'runner': run_cp_transitions, 'params': {'threshold': 0.5}},
+        # {'name': 'TR53', 'runner': run_cp_transitions, 'params': {'threshold': 0.53}},
+        # {'name': 'TR55', 'runner': run_cp_transitions, 'params': {'threshold': 0.55}},
+        # {'name': 'TR60', 'runner': run_cp_transitions, 'params': {'threshold': 0.6}},
+        #
+        # {'name': 'BNB3.25', 'runner': run_cp_stochastic_multi_mode_buf,
+        #  'params': {'N': 30, 'max_b': 3, 'sum_of_buf': 25}},
+
+        # {'name': 'MBr', 'runner': run_cp_stochastic_avg_d_makespan_bound,
+        #  'params': {'N': 50, 'makespan_delta': 10, 'first_runner': run_cp_simp, 'first_runner_params': {},
+        #             'first_time_limit': 20, 'obj': 'avg_rm'}},
+        # {'name': 'MBs1', 'runner': run_cp_stochastic_avg_d_makespan_bound,
+        #  'params': {'N': 50, 'makespan_delta': 10, 'first_runner': run_cp_simp, 'first_runner_params': {},
+        #             'first_time_limit': 20, 'obj': 'avg_exp_ovp'}},
+        # {'name': 'MBs2', 'runner': run_cp_stochastic_avg_d_makespan_bound,
+        #  'params': {'N': 50, 'makespan_delta': 10, 'first_runner': run_cp_simp, 'first_runner_params': {},
+        #             'first_time_limit': 20, 'obj': 'max_exp_ovp'}},
+        # {'name': 'MBmR', 'runner': run_cp_stochastic_avg_d_makespan_bound,
+        #  'params': {'N': 50, 'makespan_delta': 10, 'first_runner': run_cp_simp, 'first_runner_params': {},
+        #             'first_time_limit': 20, 'obj': 'max_rm'}},
+        {'name': 'MBmS', 'runner': run_cp_stochastic_avg_d_makespan_bound,
+         'params': {'N': 30, 'makespan_delta': 5, 'first_runner': run_cp_simp, 'first_runner_params': {},
+                    'first_time_limit': 20, 'obj': 'max_max_ovp'}},
+
+
+        {'name': 'BBr', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 1, 'sum_of_buf': 5 * MACHINES_NUM, 'obj': 'avg_rm'}},
+        # {'name': 'BBs1', 'runner': run_cp_stochastic_multi_mode_buf,
+        #  'params': {'N': 30, 'max_b': 2, 'sum_of_buf': 5 * MACHINES_NUM, 'obj': 'avg_rm'}},
+        # {'name': 'BBs2', 'runner': run_cp_stochastic_multi_mode_buf,
+        #  'params': {'N': 30, 'max_b': 3, 'sum_of_buf': 5 * MACHINES_NUM, 'obj': 'avg_rm'}},
+        # {'name': 'BBmR', 'runner': run_cp_stochastic_multi_mode_buf,
+        #  'params': {'N': 30, 'max_b': 4, 'sum_of_buf': 5 * MACHINES_NUM, 'obj': 'avg_rm'}},
+        # {'name': 'BBmS', 'runner': run_cp_stochastic_multi_mode_buf,
+        #  'params': {'N': 30, 'max_b': 5, 'sum_of_buf': 5 * MACHINES_NUM, 'obj': 'avg_rm'}},
+
+        # {'name': 'SGS_Rand', 'runner': run_sgs_rand},
+        # {'name': 'SGS_SJF', 'runner': run_sgs_sjf},
+        # {'name': 'SGS_SJL', 'runner': run_sgs_sjl},
+    ])
+
+    distributions = ['exponential'] #, 'normal', 'exponential']
+    for distribution in distributions:
+        run_experiment(NOT_DUMMY_V_NUM,
+                       distribution,
+                       MACHINES_NUM,
+                       PROBLEMS_NUM,
+                       TIME_LIMIT,
+                       GRAPH_DIR,
+                       TASKS_DIR,
+                       experiments)

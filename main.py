@@ -8,10 +8,57 @@ print('Hello World!')
 # look in training_experiments.py
 
 from class_graph import PrecedenceGraph
+from class_graph import Task
+from class_problem import Problem
+from class_schedule import Schedule, mean_of_distribution
 from class_graph_algs import PGAlgorithms, print_networkx_graph, is_graph_disjunctive
 from writers_readers import *
 
+
 if __name__ == '__main__':
+    gr = PrecedenceGraph()
+    gr.add_edge(0, 1)
+    gr.add_edge(0, 2)
+    gr.add_edge(1, 3)
+    gr.add_edge(1, 4)
+    gr.add_edge(2, 4)
+    gr.add_edge(3, 5)
+    gr.add_edge(4, 5)
+
+    # alg = PGAlgorithms(gr)
+    # print_networkx_graph(alg.make_networkx_graph())
+
+    t0 = Task(0, 0, {0: 1.})
+    t1 = Task(1, 2, {1: 2. / 5, 2: 1. / 5, 3: 2. / 5})
+    t2 = Task(2, 3, {2: 0.25, 3: 0.5, 4: 0.25})
+    t3 = Task(3, 3, {2: 1. / 3, 3: 1. / 3, 4: 1. / 3})
+    t4 = Task(4, 2, {1: 1. / 4, 2: 1. / 2, 3: 1. / 4})
+    t5 = Task(0, 0, {0: 1.})
+
+    problem = Problem(gr, {0: t0, 1: t1, 2: t2, 3: t3, 4: t4, 5: t5}, 2)
+
+    sch = Schedule(problem)
+    sch.schedule_task(0, 0, 0)
+    sch.schedule_task(0, 1, 0)
+    sch.schedule_task(0, 3, 2)
+    sch.schedule_task(1, 2, 0)
+    sch.schedule_task(1, 4, 3)
+    sch.schedule_task(1, 5, 5)
+
+    exact_overlap_dist = sch.calculate_exact_overlap_distributions()
+    print(f'exact_overlap_dist: {exact_overlap_dist}')
+    avg_deltas = {i: mean_of_distribution(exact_overlap_dist[i]) for i in exact_overlap_dist.keys()}
+
+    last_id = next(iter(sch.get_last_tasks()))
+
+    makespan = sch.get_makespan()
+    sm1 = np.mean(list(avg_deltas.values()))
+    sm2 = np.max(list(avg_deltas.values()))
+    rm = avg_deltas[last_id]
+
+    print(f'makespan:{makespan}, sm1: {sm1}, sm2: {sm2}, rm: {rm}')
+
+if __name__ == '__main':
     a = 1
     if a:
         size = 10**8

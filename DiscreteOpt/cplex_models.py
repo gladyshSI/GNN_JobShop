@@ -505,7 +505,7 @@ def cplex_combined_trans_pc_max(pg, t_to_res, r_num, rl_passes_list, makespan=10
     return gap, make_schedule_from_cplex_simple(pg, t_to_res, r_num, msol, rik)
 
 
-def cplex_stochastic(problem: Problem, scenarios_num=200, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+def cplex_stochastic(problem: Problem, obj: str, scenarios_num=200, p=None, time_limit=2, log_output=True) -> (Schedule, float):
     tasks = list(problem.get_all_ids())
     last_task = next(iter(problem.get_end_ids()))
     resources = list(range(problem.get_machines_num()))
@@ -565,12 +565,37 @@ def cplex_stochastic(problem: Problem, scenarios_num=200, p=None, time_limit=2, 
         for s in range(1, scenarios_num):
             mdl.add(mdl.same_sequence(seq_ks[(k, 0)], seq_ks[(k, s)]))
 
+    # start before start (Right-Shift constraint)
+    for j in tasks:
+        for s in range(1, scenarios_num):
+            mdl.add(mdl.start_before_start(x_is[(j, 0)], x_is[(j, s)]))
+
     # OBJECTIVE:
     obj_s = {}
-    for s in range(scenarios_num):
-        obj_s[s] = mdl.max([0,
-                            mdl.start_of(x_is[(last_task, s)]) - mdl.start_of(x_is[(last_task, 0)])])
-    agg_obj = mdl.max([obj_s[s] for s in range(scenarios_num)])
+    agg_obj = 0
+
+    if obj == "avg_rm":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.start_of(x_is[(last_task, s)]) - mdl.start_of(x_is[(last_task, 0)])
+        agg_obj = mdl.sum([obj_s[s] for s in range(1, scenarios_num)])
+    if obj == "max_rm":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.start_of(x_is[(last_task, s)]) - mdl.start_of(x_is[(last_task, 0)])
+        agg_obj = mdl.max([obj_s[s] for s in range(1, scenarios_num)])
+    if obj == "avg_exp_ovp":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.sum([(mdl.start_of(x_is[(i, s)]) - mdl.start_of(x_is[(i, 0)])) for i in tasks])
+        agg_obj = mdl.sum([obj_s[s] for s in range(1, scenarios_num)])
+    if obj == "max_exp_ovp":
+        obj_i = {i: 0 for i in tasks}
+        for i in tasks:
+            for s in range(1, scenarios_num):
+                obj_i[i] += mdl.start_of(x_is[(i, s)]) - mdl.start_of(x_is[(i, 0)])
+        agg_obj = mdl.max([obj_i[i] for i in tasks])
+    if obj == "max_max_ovp":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.max([(mdl.start_of(x_is[(i, s)]) - mdl.start_of(x_is[(i, 0)])) for i in tasks])
+        agg_obj = mdl.max([obj_s[s] for s in range(1, scenarios_num)])
 
     mdl.add(mdl.minimize_static_lex([mdl.end_of(x_is[(last_task, 0)]),
                                      agg_obj]))
@@ -642,6 +667,11 @@ def cplex_stochastic_avg_delta(problem: Problem, scenarios_num=200, p=None, time
         for s in range(1, scenarios_num):
             mdl.add(mdl.same_sequence(seq_ks[(k, 0)], seq_ks[(k, s)]))
 
+    # start before start (Right-Shift constraint)
+    for j in tasks:
+        for s in range(1, scenarios_num):
+            mdl.add(mdl.start_before_start(x_is[(j, 0)], x_is[(j, s)]))
+
     # OBJECTIVE:
     obj_s = {}
     for s in range(scenarios_num):
@@ -660,7 +690,7 @@ def cplex_stochastic_avg_delta(problem: Problem, scenarios_num=200, p=None, time
     return make_schedule_from_cplex_stochastic(problem, msol, r_iks, fr_scenario=0), gap
 
 
-def cplex_stochastic_avg_d_makespan_bound(problem: Problem, makespan=1000, scenarios_num=200, p=None, time_limit=2, log_output=True):
+def cplex_stochastic_avg_d_makespan_bound(problem: Problem, obj: str, makespan=1000, scenarios_num=200, p=None, time_limit=2, log_output=True):
     tasks = list(problem.get_all_ids())
     last_task = next(iter(problem.get_end_ids()))
     resources = list(range(problem.get_machines_num()))
@@ -730,10 +760,28 @@ def cplex_stochastic_avg_d_makespan_bound(problem: Problem, makespan=1000, scena
 
     # OBJECTIVE:
     obj_s = {}
-    for s in range(scenarios_num):
-        sum_delta = mdl.max([(mdl.start_of(x_is[(i, s)]) - mdl.start_of(x_is[(i, 0)])) for i in tasks])
-        obj_s[s] = sum_delta
-    agg_obj = mdl.max([obj_s[s] for s in range(scenarios_num)])
+    if obj == "avg_rm":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.start_of(x_is[(last_task, s)]) - mdl.start_of(x_is[(last_task, 0)])
+        agg_obj = mdl.sum([obj_s[s] for s in range(1, scenarios_num)])
+    if obj == "max_rm":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.start_of(x_is[(last_task, s)]) - mdl.start_of(x_is[(last_task, 0)])
+        agg_obj = mdl.max([obj_s[s] for s in range(1, scenarios_num)])
+    if obj == "avg_exp_ovp":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.sum([(mdl.start_of(x_is[(i, s)]) - mdl.start_of(x_is[(i, 0)])) for i in tasks])
+        agg_obj = mdl.sum([obj_s[s] for s in range(1, scenarios_num)])
+    if obj == "max_exp_ovp":
+        obj_i = {i: 0 for i in tasks}
+        for i in tasks:
+            for s in range(1, scenarios_num):
+                obj_i[i] += mdl.start_of(x_is[(i, s)]) - mdl.start_of(x_is[(i, 0)])
+        agg_obj = mdl.max([obj_i[i] for i in tasks])
+    if obj == "max_max_ovp":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.max([(mdl.start_of(x_is[(i, s)]) - mdl.start_of(x_is[(i, 0)])) for i in tasks])
+        agg_obj = mdl.max([obj_s[s] for s in range(1, scenarios_num)])
 
     mdl.add(mdl.minimize(agg_obj))
 
@@ -822,7 +870,7 @@ def cplex_stochastic_max_delta(problem: Problem, scenarios_num=200, p=None, time
     return make_schedule_from_cplex_stochastic(problem, msol, r_iks, fr_scenario=0), gap
 
 
-def cplex_stochastic_multi_mode_buf(problem: Problem, max_buf_size=100, scenarios_num=200, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+def cplex_stochastic_multi_mode_buf(problem: Problem, obj: str, num_of_buf_modes, sum_of_buf=100, scenarios_num=200, p=None, time_limit=2, log_output=True) -> (Schedule, float):
     tasks = list(problem.get_all_ids())
     last_task = next(iter(problem.get_end_ids()))
     resources = list(range(problem.get_machines_num()))
@@ -837,7 +885,9 @@ def cplex_stochastic_multi_mode_buf(problem: Problem, max_buf_size=100, scenario
         for v in tasks:
             p.append(problem.get_duration(v))
 
-    m = 2  # Number of buffer modes
+    if num_of_buf_modes < 1:
+        raise ValueError("num_of_buf_modes includes buf=0, so it should be at least 1")
+    m = num_of_buf_modes  # Number of buffer modes (including 0)
     p_buf_modes = [[pi + buf for buf in range(m)] for pi in p]  # initial durations with different buffer times
 
     scenarios = [p]
@@ -848,7 +898,6 @@ def cplex_stochastic_multi_mode_buf(problem: Problem, max_buf_size=100, scenario
 
     # MODEL
     mdl = CpoModel()
-    # TODO: check start domains, how did I get them?
     # VARIABLES:
     # ==== for initial scenario ====
     x_i = {}  # job i in the initial scenario
@@ -921,14 +970,33 @@ def cplex_stochastic_multi_mode_buf(problem: Problem, max_buf_size=100, scenario
             mdl.add(mdl.start_before_start(x_i[j], x_is[(j, s)]))
 
     # bound num of buffer times:
-    max_buf_num = max_buf_size
-    mdl.add(mdl.sum(1 * mdl.presence_of(x_im[(i, 1)]) for i in tasks) == max_buf_num)
+    max_buf_num = sum_of_buf
+    mdl.add(mdl.sum(bj * mdl.presence_of(x_im[(i, bj)]) for i in tasks for bj in range(m)) == max_buf_num)
 
     # OBJECTIVE:
     obj_s = {}
-    for s in range(1, scenarios_num):
-        obj_s[s] = mdl.max([mdl.start_of(x_is[(i, s)]) - mdl.start_of(x_i[i]) for i in tasks])
-    agg_obj = mdl.max([obj_s[s] for s in range(1, scenarios_num)])
+    if obj == "avg_rm":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.start_of(x_is[(last_task, s)]) - mdl.start_of(x_i[last_task])
+        agg_obj = mdl.sum([obj_s[s] for s in range(1, scenarios_num)])
+    if obj == "max_rm":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.start_of(x_is[(last_task, s)]) - mdl.start_of(x_i[last_task])
+        agg_obj = mdl.max([obj_s[s] for s in range(1, scenarios_num)])
+    if obj == "avg_exp_ovp":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.sum([(mdl.start_of(x_is[(i, s)]) - mdl.start_of(x_i[i])) for i in tasks])
+        agg_obj = mdl.sum([obj_s[s] for s in range(1, scenarios_num)])
+    if obj == "max_exp_ovp":
+        obj_i = {i: 0 for i in tasks}
+        for i in tasks:
+            for s in range(1, scenarios_num):
+                obj_i[i] += mdl.start_of(x_is[(i, s)]) - mdl.start_of(x_i[i])
+        agg_obj = mdl.max([obj_i[i] for i in tasks])
+    if obj == "max_max_ovp":
+        for s in range(1, scenarios_num):
+            obj_s[s] = mdl.max([(mdl.start_of(x_is[(i, s)]) - mdl.start_of(x_i[i])) for i in tasks])
+        agg_obj = mdl.max([obj_s[s] for s in range(1, scenarios_num)])
 
     mdl.add(mdl.minimize_static_lex([mdl.end_of(x_i[last_task]), agg_obj]))
 

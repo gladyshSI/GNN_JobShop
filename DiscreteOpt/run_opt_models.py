@@ -254,8 +254,9 @@ def run_cp_combined(pg, t_to_res, time_limit):
 
 def run_cp_stochastic(problem: Problem, time_limit: int, parameters: dict) -> (Schedule, float, float):
     scenarios_num = parameters['N']
+    obj = parameters['obj']
     start_time = time.time()
-    sch, gap = cplex_stochastic(problem, scenarios_num=scenarios_num, time_limit=time_limit, log_output=True)
+    sch, gap = cplex_stochastic(problem, obj=obj, scenarios_num=scenarios_num, time_limit=time_limit, log_output=True)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
@@ -285,6 +286,7 @@ def run_cp_stochastic_avg_d_makespan_bound(problem: Problem, time_limit: int, pa
     first_time_limit = parameters['first_time_limit']
     makespan_delta = parameters['makespan_delta']
     scenarios_num = parameters['N']
+    obj = parameters['obj']
 
     # Find opt makespan, using first runner
     sch, gap, solv_time = first_runner(problem, first_time_limit, first_runner_params)
@@ -293,6 +295,7 @@ def run_cp_stochastic_avg_d_makespan_bound(problem: Problem, time_limit: int, pa
     start_time = time.time()
     sch, gap = cplex_stochastic_avg_d_makespan_bound(problem, makespan=makespan,
                                                      scenarios_num=scenarios_num,
+                                                     obj=obj,
                                                      time_limit=time_limit,
                                                      log_output=True)
     end_time = time.time()
@@ -301,12 +304,16 @@ def run_cp_stochastic_avg_d_makespan_bound(problem: Problem, time_limit: int, pa
 
 
 def run_cp_stochastic_multi_mode_buf(problem: Problem, time_limit: int, parameters: dict) -> (Schedule, float, float):
-    max_buf_size = parameters['max_buf_size']
+    sum_of_buf = parameters['sum_of_buf']
     scenarios_num = parameters['N']
+    max_b = parameters['max_b']
+    obj = parameters['obj']
     start_time = time.time()
     sch, gap = cplex_stochastic_multi_mode_buf(problem,
-                                               max_buf_size=max_buf_size,
+                                               num_of_buf_modes=max_b+1,  # including buf=0
+                                               sum_of_buf=sum_of_buf,
                                                scenarios_num=scenarios_num,
+                                               obj=obj,
                                                time_limit=time_limit,
                                                log_output=True)
     end_time = time.time()

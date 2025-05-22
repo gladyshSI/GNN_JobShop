@@ -53,7 +53,6 @@ class Problem:
             raise ValueError(f'Task {task_id} not found')
         return self._tasks[task_id].get_max_possible_dur()
 
-
     def get_task_distribution(self, task_id: int) -> dict[int, float]:
         if task_id not in self._tasks.keys():
             raise ValueError('Task not found')

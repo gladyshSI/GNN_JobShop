@@ -258,62 +258,64 @@ def make_pair_comparison(label1, metrics1, label2, metrics2, metrix_name):
 
 
 if __name__ == '__main__':
-    MODE = 3
+    MODE = 1
     if MODE == 1:
         labels = [
-            'cp_simp',
-            # 'cp_stochastic',
-            # 'cp_stochastic_avg_delta',
-            # 'cp_stochastic_max_delta',
-            'cp_weights',
-            # 'cp_buffer_times',
-            # 'cp_transitions'
+            'STrm2',
+            'STrm10',
+            'STrm30',
+            'STrm50',
+            'STrm100',
+            'STrm150',
         ]
-        no_dummy_tasks_num = 50
+        no_dummy_tasks_num = 60
         distribution_type = 'exponential'
-        metrics_files = [f'./Output/opt_experiment_metrics/{no_dummy_tasks_num}_tasks_{distribution_type}/metrics_{label}.txt' for label in labels]
+        problems_num = 50
+        # metrics_files = [f'./Output/opt_experiment_metrics/{no_dummy_tasks_num}_tasks_{distribution_type}/metrics_{label}.txt' for label in labels]
+        folder = 'N2-150exp'
+        machines_num = 5
+        metrics_files = [f'./Output/opt_experiment_metrics/{folder}/{no_dummy_tasks_num}_{distribution_type}_{machines_num}_{label}.txt' for label in labels]
         all_metrics = make_all_metrics_from_files(metrics_files)
 
         labels_to_print = [
-            'baseline',
-            # 'stoch. RM',
-            # 'stoch. SM1',
-            # 'stoch. SM2',
-            'SJF',
-            # 'buffers',
-            # 'transitions'
+            'STrm2',
+            'STrm10',
+            'STrm30',
+            'STrm50',
+            'STrm100',
+            'STrm150',
         ]
 
-        make_box_plot(all_metrics, labels_to_print, title=f'100 Problems with {no_dummy_tasks_num} no dummy jobs and {distribution_type} duration distribution')
+        make_box_plot(all_metrics, labels_to_print, title=f'{problems_num} Problems with {no_dummy_tasks_num} no dummy jobs and {distribution_type} duration distribution')
     elif MODE == 2:
         # RADAR CHART
         labels = [
-            # 'cp_simp',
-            'cp_stochastic',
-            # 'cp_stochastic_avg_delta',
-            # 'cp_stochastic_max_delta',
-            # 'cp_weights',
-            'cp_buffer_times',
-            'cp_transitions'
+            'DET',
+            'STrm30',
+            'BT25',
+            'TR35',
+            'MBmS',
+            'BBr',
         ]
 
-        experiments = [(50, 'uniform'), (50, 'normal'), (50, 'exponential')]
+        folder = '60PSPLib'
+        machines_num = 5
+        experiments = [(60, 'exponential')]# , (60, 'normal'), (60, 'exponential')]
         all_metrics_list_dif_exp = []
         for no_dummy_tasks_num, distribution_type in experiments:
             metrics_files = [
-                f'./Output/opt_experiment_metrics/{no_dummy_tasks_num}_tasks_{distribution_type}/metrics_{label}.txt'
+                f'./Output/opt_experiment_metrics/{folder}/{no_dummy_tasks_num}_{distribution_type}_{machines_num}_{label}.txt'
                 for label in labels]
             all_metrics_one_exp = make_all_metrics_from_files(metrics_files)
             all_metrics_list_dif_exp.append(all_metrics_one_exp)
 
         labels_to_print_radar = [
-            # 'baseline',
-            'stoch. RM',
-            # 'stoch. SM1',
-            # 'stoch. SM2',
-            # 'SJF',
-            'buffers',
-            'transitions'
+            'DET',
+            'STrm30',
+            'BT25',
+            'TR35',
+            'MBmS',
+            'BBr',
         ]
         title = "Average models' rank"
         make_radar_charts(all_metrics_list_dif_exp, labels_to_print_radar, experiments, title)

@@ -32,7 +32,7 @@ def pareto_run_cp_stochastic_multi_mode_buf(problem: Problem,
                                             scenarios_num=50) -> (Schedule, float, float):
     start_time = time.time()
     sch, gap = cplex_stochastic_multi_mode_buf(problem,
-                                               max_buf_size=max_buf_size,
+                                               sum_of_buf=max_buf_size,
                                                scenarios_num=scenarios_num,
                                                time_limit=time_limit,
                                                log_output=True)
