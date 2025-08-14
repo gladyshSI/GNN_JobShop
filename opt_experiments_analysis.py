@@ -29,7 +29,7 @@ def calculate_best_metrics(all_metrics: list[list[dict[str, float]]]) -> list[di
     return best_metrics_for_each_problem
 
 
-def make_box_plot(all_metrics: list[list[dict[str, float]]], labels: list[str], problem_id=0, title='') -> None:
+def make_box_plot(all_metrics: list[list[dict[str, float]]], labels: list[str], problem_id=0, title='', plot_file_name='plot.svg') -> None:
     # Draw the boxplot of differences with the best model for each solved problem
     # Best model can be different for each metric and for each problem
     models_num = len(all_metrics)
@@ -49,7 +49,7 @@ def make_box_plot(all_metrics: list[list[dict[str, float]]], labels: list[str], 
     # axs[0, 0].scatter(x, point)
     axs[0, 0].tick_params(axis='both', which='major', labelsize=labelsize)
     axs[0, 0].boxplot(delta_with_min, labels=labels)
-    axs[0, 0].set_title('Solving Time (Δ with min.)', fontsize=fontsize)
+    axs[0, 0].set_title('Solution Time (Δ with min.)', fontsize=fontsize)
 
     data = [[m['gap'] for m in metrics_list] for metrics_list in all_metrics]
     delta_with_min = [[data[i][j] - best_metrics_for_each_problem[j]['gap'] for j in range(problems_num)] for i in
@@ -99,7 +99,7 @@ def make_box_plot(all_metrics: list[list[dict[str, float]]], labels: list[str], 
 
     plt.tight_layout()
     fig_dir = "./Output/plots/"
-    plt.savefig(fig_dir + 'opt_exp_boxplot_compare_with_min.png')
+    plt.savefig(fig_dir + plot_file_name)
     plt.show()
 
 
@@ -133,18 +133,21 @@ def calculate_place_distributions(all_metrics: list[list[dict[str, float]]], lab
     return place_distributions
 
 
-def make_radar_charts(all_metrics_list_dif_exp: list[list[list[dict[str, float]]]], labels: list[str], experiments: list[(int, str)], title='') -> None:
+def make_radar_charts(all_metrics_list_dif_exp: list[list[list[dict[str, float]]]], labels: list[list[str]],
+                      experiments: list[(int, str)], title='', plot_file_name='radar.svg') -> None:
     num_vars = len(all_metrics_list_dif_exp[0][0][0].keys())
     metrics = all_metrics_list_dif_exp[0][0][0].keys()
     print(metrics)
+    # Determine the number of plots needed (one for each set of all_metrics)
+    num_plots = len(all_metrics_list_dif_exp)
     # TODO: fix hardcode
-    metrics_to_print = ['init. makespan', 'SM1', 'SM2', 'RM', 'Gap', 'solv. time']
+    if len(labels) == 1:
+        labels = [labels[0] for _ in range(num_plots)]
+    metrics_to_print = ['init. makespan', 'SM1', 'SM2', 'RM', 'Gap', 'solution time']
+
     # Compute angles for each axis
     angles = np.linspace(0, 2 * np.pi, num_vars, endpoint=False).tolist()
     angles += angles[:1]  # Complete the circle
-
-    # Determine the number of plots needed (one for each set of all_metrics)
-    num_plots = len(all_metrics_list_dif_exp)
 
     # Initialize the figure with subplots in a single row
     fig, axs = plt.subplots(nrows=1, ncols=num_plots, figsize=(8 * num_plots, 8), subplot_kw=dict(polar=True))
@@ -160,7 +163,7 @@ def make_radar_charts(all_metrics_list_dif_exp: list[list[list[dict[str, float]]
     ]
 
     for idx, all_metrics in enumerate(all_metrics_list_dif_exp):
-        place_distributions = calculate_place_distributions(all_metrics, labels, step=0.1)
+        place_distributions = calculate_place_distributions(all_metrics, labels[idx], step=0.1)
         avg_place = dict()  # model_name -> metric -> avg_place
         for model_name, metric_to_dist in place_distributions.items():
             avg_place[model_name] = dict()
@@ -186,7 +189,7 @@ def make_radar_charts(all_metrics_list_dif_exp: list[list[list[dict[str, float]]
         axs[idx].set_yticklabels([])  # Optionally remove radial grid lines
         axs[idx].set_xticks(angles[:-1])
         axs[idx].set_xticklabels(metrics_to_print)
-        axs[idx].legend(loc='upper left', bbox_to_anchor=(-0.15, 0.9), fontsize=15)
+        axs[idx].legend(loc='upper right', bbox_to_anchor=(1.25, 1.05), fontsize=23)  # bbox_to_anchor=(-0.15, 0.9)
         axs[idx].set_title(f'Distribution type: {experiments[idx][1]}', size=25, y=1.05)
 
     # Add a main title for the entire figure
@@ -195,7 +198,7 @@ def make_radar_charts(all_metrics_list_dif_exp: list[list[list[dict[str, float]]
     # Adjust layout and spacing
     plt.tight_layout()
     fig_dir = "./Output/plots/"
-    plt.savefig(fig_dir + 'opt_exp_radar_charts.png')
+    plt.savefig(fig_dir + plot_file_name, dpi=330)
     plt.show()
 
 
