@@ -40,10 +40,10 @@ def make_schedule_from_cplex_stochastic(problem: Problem, msol, r_iks, fr_scenar
 
 
 def make_schedule_from_cplex_stochastic_multi_mode(problem: Problem, msol, r_ik, x_im) -> Schedule:
-    for im, xim in x_im.items():
-        var_sol = msol.get_var_solution(xim)
-        if var_sol.is_present():
-            print("PRESENT (i, m)", im)
+    # for im, xim in x_im.items():
+    #     var_sol = msol.get_var_solution(xim)
+    #     if var_sol.is_present():
+    #         print("PRESENT (i, m)", im)
 
     sch = Schedule(problem)
     starting_times = dict()  # task_id -> st

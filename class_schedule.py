@@ -2,6 +2,7 @@ import copy
 import pandas as pd
 from collections import deque
 import plotly.express as px
+import ast
 
 from class_problem import Problem
 
@@ -293,6 +294,15 @@ class Schedule:
                 df.index = df.index + 1
                 df = df.sort_index()
         return df
+
+    def to_str(self) -> str:
+        return str([(j, w, st) for j, (w, st) in self._rev_sch.items()])
+
+    def from_str(self, data: str):
+        data = ast.literal_eval(data)
+        for j, w, st in data:
+            self.schedule_task(machine_id=w, task_id=j, start_time=st)
+        return
 
 
 class SchAlgorithms:

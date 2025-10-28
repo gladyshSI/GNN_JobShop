@@ -5,8 +5,8 @@ from class_schedule import Schedule
 from Keys.gurobi_keys import GUROBI_OPTIONS
 
 
-def make_schedule_from_qp_simple(pg, t_to_res, xit, rik):
-    sch = Schedule(pg, t_to_res)
+def make_schedule_from_qp_simple(problem, xit, rik):
+    sch = Schedule(problem)
     starting_times = dict()  # task_id -> st
     chosen_resources = dict()  # task_id -> res
     for index, res in xit.items():
@@ -16,29 +16,31 @@ def make_schedule_from_qp_simple(pg, t_to_res, xit, rik):
         if abs(res - 1.0) < 0.001:
             chosen_resources[index[0]] = index[1]
 
-    tasks = sorted(list(range(len(pg._vertices))), key=lambda x: starting_times[x])
+    tasks = sorted(problem.get_all_ids(), key=lambda x: starting_times[x])
     for t in tasks:
         sch.schedule_task(chosen_resources[t], t, starting_times[t])
 
     return sch
 
 
-def gurobi_qp_simple(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, time_limit=24 * 60 * 60,
+def gurobi_qp_simple(problem, rl_passes_list, makespan=1000, p=None, time_limit=24 * 60 * 60,
                      log_output=True):
-    task_num = len(pg._vertices)
-    tasks = list(range(task_num))
-    last_task = task_num - 1
-    resources = list(range(r_num))
+    tasks = list(problem.get_all_ids())
+    task_num = len(tasks)
+    last_task = next(iter(problem.get_end_ids()))
+    resources = list(range(problem.get_machines_num()))
+    r_num = len(resources)
     H = list(range(makespan))
+
     edge_list = []
-    for i, js in pg._edges.items():
+    for i, js in problem.get_copy_of_all_edges().items():
         for j in js:
             edge_list.append((i, j))
 
     if p == None:
         p = []
         for v in range(task_num):
-            p.append(pg.get_duration(v))
+            p.append(problem.get_duration(v))
 
     with gp.Env(params=GUROBI_OPTIONS) as env, gp.Model(env=env) as model:
         # MODEL:
@@ -81,7 +83,7 @@ def gurobi_qp_simple(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None,
 
         xit, rik = {(i, t): xit[i, t].getAttr('X') for i in tasks for t in H}, \
             {(i, k): rik[i, k].getAttr('X') for i in tasks for k in resources}
-        return gap, make_schedule_from_qp_simple(pg, t_to_res, xit, rik)
+        return gap, make_schedule_from_qp_simple(problem, xit, rik)
 
 
 def make_schedule_from_milp_simple(pg, t_to_res, x_imt):
