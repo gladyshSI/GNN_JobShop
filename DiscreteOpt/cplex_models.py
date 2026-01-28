@@ -61,7 +61,7 @@ def make_schedule_from_cplex_stochastic_multi_mode(problem: Problem, msol, r_ik,
     return sch
 
 
-def cplex_simple(problem: Problem, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+def cplex_simple(problem: Problem, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True, execfile=None) -> (Schedule, float):
     tasks = list(problem.get_all_ids())
     task_num = len(tasks)
     last_task = next(iter(problem.get_end_ids()))
@@ -109,13 +109,16 @@ def cplex_simple(problem: Problem, rl_passes_list, makespan=1000, p=None, time_l
     mdl.add(mdl.minimize(mdl.end_of(xi[last_task])))
 
     # Solve the model
-    msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+    if execfile is not None:
+        msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+    else:
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
     return make_schedule_from_cplex_simple(problem, msol, rik), gap
 
 
-def cplex_pg_time_lags_max(problem: Problem, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+def cplex_pg_time_lags_max(problem: Problem, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True, execfile=None) -> (Schedule, float):
     tasks = list(problem.get_all_ids())
     task_num = len(tasks)
     last_task = next(iter(problem.get_end_ids()))
@@ -188,14 +191,17 @@ def cplex_pg_time_lags_max(problem: Problem, rl_passes_list, makespan=1000, p=No
                                      ]))
 
     # Solve the model
-    msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+    if execfile is not None:
+        msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+    else:
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
     # print("makespan =", msol.get_objective_values()[0])
     return make_schedule_from_cplex_simple(problem, msol, rik), gap
 
 
-def cplex_weights(problem: Problem, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+def cplex_weights(problem: Problem, rl_passes_list, makespan=1000, p=None, time_limit=2, log_output=True, execfile=None) -> (Schedule, float):
     tasks = list(problem.get_all_ids())
     task_num = len(tasks)
     last_task = next(iter(problem.get_end_ids()))
@@ -248,13 +254,16 @@ def cplex_weights(problem: Problem, rl_passes_list, makespan=1000, p=None, time_
                                      mdl.sum([weights[i] * mdl.end_of(xi[i]) for i in tasks])]))
 
     # Solve the model
-    msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+    if execfile is not None:
+        msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+    else:
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
     return make_schedule_from_cplex_simple(problem, msol, rik), gap
 
 
-def cplex_buffer_times(problem: Problem, buffers: dict[int, int], p=None, time_limit=2, log_output=True) -> (Schedule, float):
+def cplex_buffer_times(problem: Problem, buffers: dict[int, int], p=None, time_limit=2, log_output=True, execfile=None) -> (Schedule, float):
     tasks = list(problem.get_all_ids())
     last_task = next(iter(problem.get_end_ids()))
     resources = list(range(problem.get_machines_num()))
@@ -299,13 +308,16 @@ def cplex_buffer_times(problem: Problem, buffers: dict[int, int], p=None, time_l
         mdl.add(mdl.minimize(mdl.end_of(xi[last_task])))
 
         # Solve the model
-        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+        if execfile is not None:
+            msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+        else:
+            msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
         gap = msol.get_objective_gap()
 
     return make_schedule_from_cplex_simple(problem, msol, rik), gap
 
 
-def cplex_multimode_buffer_times(problem: Problem, modes: list, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+def cplex_multimode_buffer_times(problem: Problem, modes: list, p=None, time_limit=2, log_output=True, execfile=None) -> (Schedule, float):
     tasks = list(problem.get_all_ids())
     last_task = next(iter(problem.get_end_ids()))
     resources = list(range(problem.get_machines_num()))
@@ -354,14 +366,17 @@ def cplex_multimode_buffer_times(problem: Problem, modes: list, p=None, time_lim
         mdl.add(mdl.minimize(mdl.end_of(xi[last_task])))
 
         # Solve the model
-        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+        if execfile is not None:
+            msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+        else:
+            msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
         gap = msol.get_objective_gap()
 
     return make_schedule_from_cplex_simple(problem, msol, rik), gap
 
 
 def cplex_transitions(problem: Problem,
-                      transitions: dict[int, dict[int, int]], p=None, time_limit=2, log_output=True) -> (Schedule, float):
+                      transitions: dict[int, dict[int, int]], p=None, time_limit=2, log_output=True, execfile=None) -> (Schedule, float):
     tasks = list(problem.get_all_ids())
     last_task = next(iter(problem.get_end_ids()))
     resources = list(range(problem.get_machines_num()))
@@ -415,14 +430,17 @@ def cplex_transitions(problem: Problem,
     mdl.add(mdl.minimize(mdl.end_of(xi[last_task])))
 
     # Solve the model
-    msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+    if execfile is not None:
+        msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+    else:
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
     return make_schedule_from_cplex_simple(problem, msol, rik), gap
 
 
 def cplex_combined_trans_pc_max(pg, t_to_res, r_num, rl_passes_list, makespan=1000, p=None, time_limit=2,
-                                log_output=True):
+                                log_output=True, execfile=None) -> (Schedule, float):
     task_num = len(pg._vertices)
     tasks = list(range(task_num))
     last_task = task_num - 1
@@ -499,13 +517,16 @@ def cplex_combined_trans_pc_max(pg, t_to_res, r_num, rl_passes_list, makespan=10
                                      ]))
 
     # Solve the model
-    msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+    if execfile is not None:
+        msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+    else:
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
-    return gap, make_schedule_from_cplex_simple(pg, t_to_res, r_num, msol, rik)
+    return make_schedule_from_cplex_simple(pg, t_to_res, r_num, msol, rik), gap
 
 
-def cplex_stochastic(problem: Problem, obj: str, scenarios_num=200, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+def cplex_stochastic(problem: Problem, obj: str, scenarios_num=200, p=None, time_limit=2, log_output=True, execfile=None) -> (Schedule, float):
     tasks = list(problem.get_all_ids())
     last_task = next(iter(problem.get_end_ids()))
     resources = list(range(problem.get_machines_num()))
@@ -601,13 +622,16 @@ def cplex_stochastic(problem: Problem, obj: str, scenarios_num=200, p=None, time
                                      agg_obj]))
 
     # Solve the model
-    msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+    if execfile is not None:
+        msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+    else:
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
     return make_schedule_from_cplex_stochastic(problem, msol, r_iks, fr_scenario=0), gap
 
 
-def cplex_stochastic_avg_delta(problem: Problem, scenarios_num=200, p=None, time_limit=2, log_output=True):
+def cplex_stochastic_avg_delta(problem: Problem, scenarios_num=200, p=None, time_limit=2, log_output=True, execfile=None):
     tasks = list(problem.get_all_ids())
     last_task = next(iter(problem.get_end_ids()))
     resources = list(range(problem.get_machines_num()))
@@ -684,13 +708,16 @@ def cplex_stochastic_avg_delta(problem: Problem, scenarios_num=200, p=None, time
                                      agg_obj]))
 
     # Solve the model
-    msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+    if execfile is not None:
+        msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+    else:
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
     return make_schedule_from_cplex_stochastic(problem, msol, r_iks, fr_scenario=0), gap
 
 
-def cplex_stochastic_avg_d_makespan_bound(problem: Problem, obj: str, makespan=1000, scenarios_num=200, p=None, time_limit=2, log_output=True):
+def cplex_stochastic_avg_d_makespan_bound(problem: Problem, obj: str, makespan=1000, scenarios_num=200, p=None, time_limit=2, log_output=True, execfile=None):
     tasks = list(problem.get_all_ids())
     last_task = next(iter(problem.get_end_ids()))
     resources = list(range(problem.get_machines_num()))
@@ -786,13 +813,16 @@ def cplex_stochastic_avg_d_makespan_bound(problem: Problem, obj: str, makespan=1
     mdl.add(mdl.minimize(agg_obj))
 
     # Solve the model
-    msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+    if execfile is not None:
+        msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+    else:
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
     return make_schedule_from_cplex_stochastic(problem, msol, r_iks, fr_scenario=0), gap
 
 
-def cplex_stochastic_max_delta(problem: Problem, scenarios_num=200, p=None, time_limit=2, log_output=True):
+def cplex_stochastic_max_delta(problem: Problem, scenarios_num=200, p=None, time_limit=2, log_output=True, execfile=None):
     tasks = list(problem.get_all_ids())
     last_task = next(iter(problem.get_end_ids()))
     resources = list(range(problem.get_machines_num()))
@@ -864,13 +894,16 @@ def cplex_stochastic_max_delta(problem: Problem, scenarios_num=200, p=None, time
                                      agg_obj]))
 
     # Solve the model
-    msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+    if execfile is not None:
+        msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+    else:
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
     return make_schedule_from_cplex_stochastic(problem, msol, r_iks, fr_scenario=0), gap
 
 
-def cplex_stochastic_multi_mode_buf(problem: Problem, obj: str, num_of_buf_modes, sum_of_buf=100, scenarios_num=200, p=None, time_limit=2, log_output=True) -> (Schedule, float):
+def cplex_stochastic_multi_mode_buf(problem: Problem, obj: str, num_of_buf_modes, sum_of_buf=100, scenarios_num=200, p=None, time_limit=2, log_output=True, execfile=None) -> (Schedule, float):
     tasks = list(problem.get_all_ids())
     last_task = next(iter(problem.get_end_ids()))
     resources = list(range(problem.get_machines_num()))
@@ -1001,7 +1034,10 @@ def cplex_stochastic_multi_mode_buf(problem: Problem, obj: str, num_of_buf_modes
     mdl.add(mdl.minimize_static_lex([mdl.end_of(x_i[last_task]), agg_obj]))
 
     # Solve the model
-    msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
+    if execfile is not None:
+        msol = mdl.solve(execfile=execfile, TimeLimit=time_limit, log_output=log_output)
+    else:
+        msol = mdl.solve(TimeLimit=time_limit, log_output=log_output)
     gap = msol.get_objective_gap()
 
     return make_schedule_from_cplex_stochastic_multi_mode(problem, msol, r_ik, x_im), gap

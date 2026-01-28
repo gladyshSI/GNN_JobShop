@@ -7,6 +7,7 @@ import numpy as np
 import csv
 import time
 import datetime
+import argparse
 
 from matplotlib import pyplot as plt
 
@@ -26,12 +27,13 @@ from writers_readers import read_graph, read_tasks_to_dict
 
 
 def make_experiment(problem_to_solve: Problem,
-                    runner: Callable[[Problem, int, bool | None, dict], tuple[Schedule, float, float]],
+                    runner: Callable[[Problem, int, bool | None, dict, str | None], tuple[Schedule, float, float]],
                     time_limit: int,
-                    parameters: dict) -> tuple[Schedule, dict]:
-    # TODO: Add parameters to all runners
+                    parameters: dict,
+                    execfile: str | None) -> tuple[Schedule, dict]:
+    # TODO: Add parameters and execfile to all runners
     log_output = None  # or True
-    schedule, gap, time = runner(problem_to_solve, time_limit, log_output, parameters)
+    schedule, gap, time = runner(problem_to_solve, time_limit, log_output, parameters, execfile)
     m = get_metrics(schedule)
     m['gap'] = gap
     m['time'] = time
@@ -43,13 +45,23 @@ def print_sch_with_deltas(schedule: Schedule):
     print_schedule(schedule, {i: mean_of_distribution(exact_overlap_dist[i]) for i in exact_overlap_dist.keys()})
 
 
-def run_experiment(graph_file: str,
-                   jobs_file: str,
-                   output_file: str,
-                   distribution: str,
-                   machines_num: int,
-                   time_limit: int,
-                   experiments: np.array):
+def run_experiments_for_problem(graph_file: str,
+                                jobs_file: str,
+                                output_file: str,
+                                distribution: str,
+                                machines_num: int,
+                                time_limit: int,
+                                experiments: np.array,
+                                execfile: str | None = None):
+    # update experiments if needed:
+    for e in experiments:
+        if 'params' in e.keys() and 'sum_of_buf' in e['params'].keys():
+            e['params']['sum_of_buf'] = 5 * machines_num
+
+    now = datetime.datetime.now()
+    print(f'@@@@@ NOW: {now}')
+    print(f'@@@@@ START EXPERIMENTS FOR DIST {distribution}, graph_file = {graph_file}, job_file = {jobs_file}, output_file = {output_file}')
+
     # EXPERIMENTS:
     fieldnames = ['description', 'name', 'graph_f', 'jobs_f', 'distribution', 'jobs_num', 'workers_num', 'time_limit', 'schedule', 'gap', 'time', 'makespan', 'avg_delta',
                   'max_delta', 'last_delta', 'all_params']
@@ -86,20 +98,24 @@ def run_experiment(graph_file: str,
 
         print(f'####### Name: {experiment['name']} ({exp_i + 1} / {len(experiments)}) TIME LIMIT {time_limit}')
         parameters = {} if 'params' not in experiment else experiment['params']
-        schedule, metrics = make_experiment(problem_to_solve=problem, runner=experiment['runner'], time_limit=time_limit,
-                                            parameters=parameters)
-        print(f'Solved in {metrics['time']:.1f} s.; METRICS: {metrics}')
+        try:
+            schedule, metrics = make_experiment(problem_to_solve=problem, runner=experiment['runner'], time_limit=time_limit,
+                                                parameters=parameters, execfile=execfile)
+            print(f'Solved in {metrics['time']:.1f} s.; METRICS: {metrics}')
 
-        with open(output_file, 'a', newline='') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=';')
-            writer.writerow({'description': experiment['description'], 'name': experiment['name'],
-                             'graph_f': graph_file, 'jobs_f': jobs_file, 'schedule': schedule.to_str(),
-                             'distribution': distribution,
-                             'jobs_num': jobs_num, 'workers_num': machines_num, 'time_limit': time_limit,
-                             'gap': metrics['gap'], 'time': metrics['time'], 'makespan': metrics['makespan'],
-                             'avg_delta': metrics['avg_delta'], 'max_delta': metrics['max_delta'],
-                             'last_delta': metrics['last_delta'],
-                             'all_params': str(parameters)})
+            with open(output_file, 'a', newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames, delimiter=';')
+                writer.writerow({'description': experiment['description'], 'name': experiment['name'],
+                                 'graph_f': graph_file, 'jobs_f': jobs_file, 'schedule': schedule.to_str(),
+                                 'distribution': distribution,
+                                 'jobs_num': jobs_num, 'workers_num': machines_num, 'time_limit': time_limit,
+                                 'gap': metrics['gap'], 'time': metrics['time'], 'makespan': metrics['makespan'],
+                                 'avg_delta': metrics['avg_delta'], 'max_delta': metrics['max_delta'],
+                                 'last_delta': metrics['last_delta'],
+                                 'all_params': str(parameters)})
+        except Exception as e:
+            print("Error occurred in f():", e)
+            continue
 
 
     # # PRINT ONE SCHEDULE:
@@ -129,22 +145,89 @@ def run_experiment(graph_file: str,
     # labels = experiment_names
     # make_box_plot(all_metrics, labels, problem_id)
 
+class DataForExperiments:
+    def __init__(self, not_dummy_v_nums: list[int],
+                 machines_nums: list[int],
+                 from_problem_ids: list[int],
+                 problem_nums: list[int],
+                 time_limits: list[int],
+                 distributions: list[str],
+                 experiments: type(np.array)):
+        self.not_dummy_v_nums = not_dummy_v_nums
+        self.machines_nums = machines_nums
+        self.from_problem_ids = from_problem_ids
+        self.problem_nums = problem_nums
+        self.time_limits = time_limits
+        self.distributions = distributions
+        self.experiments = experiments
 
-if __name__ == "__main__":
+    def get_experiments_num(self):
+        return len(self.experiments)
+
+    def total_runs(self):
+        distributions_num = len(self.distributions)
+        pr_num = sum(self.problem_nums)
+        exp_num = len(self.experiments)
+        return pr_num * distributions_num * exp_num
+
+    def total_time(self):
+        distributions_num = len(self.distributions)
+        exp_num = len(self.experiments)
+        return sum([t_l * p_n * distributions_num * exp_num for p_n, t_l in zip(self.time_limits, self.problem_nums)])
+
+    def from_i_to_problem_data(self, i: int):
+        d_num = len(self.distributions)
+        pr_type_id = 0
+        s = self.problem_nums[0] * d_num
+        while s <= i:
+            pr_type_id += 1
+            s += self.problem_nums[pr_type_id] * d_num
+        # print(f'i = {i}, pr_type_id = {pr_type_id}')
+        rel_id = i - s + self.problem_nums[pr_type_id] * d_num
+        id = self.from_problem_ids[pr_type_id] + rel_id // d_num
+        # print(f'id {id} = fr_id { self.from_problem_ids[pr_type_id]} + {rel_id} // {d_num}')
+        dist_type = self.distributions[rel_id % d_num]
+        # print(dist_type)
+        ndv_num = self.not_dummy_v_nums[pr_type_id]
+        m_n = self.machines_nums[pr_type_id]
+        t_l = self.time_limits[pr_type_id]
+
+        GRAPH_FILES_F = [lambda ndv_num, i: './Data/PrecedenceGraphs/LOVATO_gr_aircraft1.txt',
+                         lambda ndv_num, i: './Data/PrecedenceGraphs/parsedPSPLib/' + f'graph_{ndv_num + 2}_{i}.txt',
+                         lambda ndv_num, i: './Data/PrecedenceGraphs/parsedPSPLib/' + f'graph_{ndv_num + 2}_{i}.txt']
+        JOBS_FILES_F = [lambda dist_type, ndv_num, i: './Data/Tasks/' + f'{dist_type}/tasks_{dist_type}_{194}_{0}.txt',
+                        lambda dist_type, ndv_num,
+                               i: './Data/Tasks/' + f'{dist_type}/tasks_{dist_type}_{ndv_num + 2}_{i}.txt',
+                        lambda dist_type, ndv_num,
+                               i: './Data/Tasks/' + f'{dist_type}/tasks_{dist_type}_{ndv_num + 2}_{i}.txt']
+        OUTPUT_FILES_F = [lambda dist_type, ndv_num, m_n, t_l, i, name: f'./Output/occidata/output_{name}.csv',
+                          lambda dist_type, ndv_num, m_n, t_l, i, name: f'./Output/occidata/output_{name}.csv',
+                          lambda dist_type, ndv_num, m_n, t_l, i, name: f'./Output/occidata/output_{name}.csv']
+
+        graph_file = GRAPH_FILES_F[pr_type_id](ndv_num, id)
+        job_file = JOBS_FILES_F[pr_type_id](dist_type, ndv_num, id)
+        output_file = OUTPUT_FILES_F[pr_type_id](dist_type, ndv_num, m_n, t_l, id, i)
+
+        return graph_file, job_file, output_file, dist_type, m_n, t_l
+
+
+def main():
     NOT_DUMMY_V_NUMS = [192, 120, 60]
     MACHINES_NUMS = [10, 8, 5]
     FROM_PROBLEM_IDS = [0, 1, 0]
     PROBLEMS_NUMS = [0, 1, 0]
     TIME_LIMITS = [15 * 60, 10 * 60, 5 * 60]
     # DISTRIBUTIONS = ['uniform']  #, 'normal', 'exponential']
-    DISTRIBUTIONS = ['normal'] #, 'exponential']
+    DISTRIBUTIONS = ['normal']  # , 'exponential']
 
     GRAPH_FILES_F = [lambda ndv_num, i: './Data/PrecedenceGraphs/LOVATO_gr_aircraft1.txt',
                      lambda ndv_num, i: './Data/PrecedenceGraphs/parsedPSPLib/' + f'graph_{ndv_num + 2}_{i}.txt',
                      lambda ndv_num, i: './Data/PrecedenceGraphs/parsedPSPLib/' + f'graph_{ndv_num + 2}_{i}.txt']
     JOBS_FILES_F = [lambda dist_type, ndv_num, i: './Data/Tasks/' + f'{dist_type}/tasks_{dist_type}_{194}_{0}.txt',
-                    lambda dist_type, ndv_num, i: './Data/Tasks/' + f'{dist_type}/tasks_{dist_type}_{ndv_num + 2}_{i}.txt',
-                    lambda dist_type, ndv_num, i: './Data/Tasks/' + f'{dist_type}/tasks_{dist_type}_{ndv_num + 2}_{i}.txt']
+                    lambda dist_type, ndv_num,
+                           i: './Data/Tasks/' + f'{dist_type}/tasks_{dist_type}_{ndv_num + 2}_{i}.txt',
+                    lambda dist_type, ndv_num,
+                           i: './Data/Tasks/' + f'{dist_type}/tasks_{dist_type}_{ndv_num + 2}_{i}.txt']
     OUTPUT_FILES_F = [lambda dist_type, ndv_num, m_n, t_l, i: f'./Output/opt_experiment_schedules/output.csv',
                       lambda dist_type, ndv_num, m_n, t_l, i: f'./Output/opt_experiment_schedules/output.csv',
                       lambda dist_type, ndv_num, m_n, t_l, i: f'./Output/opt_experiment_schedules/output.csv']
@@ -153,7 +236,6 @@ if __name__ == "__main__":
     experiments = np.array([
         # {'name': 'milp_simp', 'runner': run_milp_simp},
         # {'name': 'qp_simp', 'runner': run_qp_simp},
-
 
         # {'name': 'milp_weights', 'runner': run_milp_weights},
         # {'name': 'qp_weights', 'runner': run_qp_weights},
@@ -275,22 +357,28 @@ if __name__ == "__main__":
         # {'name': 'SGS_SJL', 'runner': run_sgs_sjl},
     ])
 
-    distributions_num = len(DISTRIBUTIONS)
-    pr_num = sum(PROBLEMS_NUMS)
-    exp_num = len(experiments)
-    total_runs = pr_num * distributions_num * exp_num
+    data = DataForExperiments(NOT_DUMMY_V_NUMS,
+                              MACHINES_NUMS,
+                              FROM_PROBLEM_IDS,
+                              PROBLEMS_NUMS,
+                              TIME_LIMITS,
+                              DISTRIBUTIONS,
+                              experiments)
+
+    exp_num = data.get_experiments_num()
+    total_runs = data.total_runs()
     print(f'EXPERIMENTS PER PROBLEM: {exp_num}')
     print(f'TOTAL RUNS: {total_runs}')
     t_st = time.time()
     finished = 0
     exp_dt = 0
-    total_t = sum([t_l * p_n * distributions_num * exp_num for p_n, t_l in zip(TIME_LIMITS, PROBLEMS_NUMS)])
+    total_t = data.total_time()
     print(f'TOTAL TIME: {total_t} s.')
     for i, (ndv_num, m_n, fr_p_i, p_n, t_l) in enumerate(zip(NOT_DUMMY_V_NUMS,
-                                                  MACHINES_NUMS,
-                                                  FROM_PROBLEM_IDS,
-                                                  PROBLEMS_NUMS,
-                                                  TIME_LIMITS)):
+                                                             MACHINES_NUMS,
+                                                             FROM_PROBLEM_IDS,
+                                                             PROBLEMS_NUMS,
+                                                             TIME_LIMITS)):
         # update experiments if needed:
         for e in experiments:
             if 'params' in e.keys() and 'sum_of_buf' in e['params'].keys():
@@ -304,14 +392,14 @@ if __name__ == "__main__":
                 rate = 1 if exp_dt == 0 else dt / exp_dt
                 max_rest_t = total_t - exp_dt
                 exp_rest_t = max_rest_t * rate
-                print(f'\nFINISHED {finished * exp_num} / {total_runs} ({(100 * finished * exp_num / total_runs):.1f} %) '
-                      f'TIME {dt//3600:.0f}:{(dt % 3600)//60:.0f}:{dt % 60:.0f} '
-                      f'RATE {rate:.2f} '
-                      f'MAX REST {max_rest_t//3600:.0f}:{(max_rest_t % 3600)//60:.0f}:{max_rest_t % 60:.0f} '
-                      f'EXPECTED {exp_rest_t//3600:.0f}:{(exp_rest_t % 3600)//60:.0f}:{exp_rest_t % 60:.0f}')
+                print(
+                    f'\nFINISHED {finished * exp_num} / {total_runs} ({(100 * finished * exp_num / total_runs):.1f} %) '
+                    f'TIME {dt // 3600:.0f}:{(dt % 3600) // 60:.0f}:{dt % 60:.0f} '
+                    f'RATE {rate:.2f} '
+                    f'MAX REST {max_rest_t // 3600:.0f}:{(max_rest_t % 3600) // 60:.0f}:{max_rest_t % 60:.0f} '
+                    f'EXPECTED {exp_rest_t // 3600:.0f}:{(exp_rest_t % 3600) // 60:.0f}:{exp_rest_t % 60:.0f}')
                 finished += 1
                 exp_dt += t_l * exp_num
-
 
                 graph_file = GRAPH_FILES_F[i](ndv_num, id)
                 job_file = JOBS_FILES_F[i](distribution, ndv_num, id)
@@ -319,6 +407,210 @@ if __name__ == "__main__":
 
                 now = datetime.datetime.now()
                 print(f'@@@@@ NOW: {now}')
-                print(f'@@@@@ START EXPERIMENTS FOR DIST {distribution}, graph_file = {graph_file}, job_file = {job_file}, output_file = {output_file}')
-                run_experiment(graph_file, job_file, output_file, distribution, m_n, t_l, experiments)
+                print(
+                    f'@@@@@ START EXPERIMENTS FOR DIST {distribution}, graph_file = {graph_file}, job_file = {job_file}, output_file = {output_file}')
+                run_experiments_for_problem(graph_file, job_file, output_file, distribution, m_n, t_l, experiments)
+
+
+def main_cluster(job_id: int):
+    EXECFILE = '/apps/CPLEX_Studio2211/cpoptimizer/bin/x86-64_linux/cpoptimizer'
+    # EXECFILE = None
+    NOT_DUMMY_V_NUMS = [192, 120, 60]
+    MACHINES_NUMS = [10, 8, 5]
+    FROM_PROBLEM_IDS = [0, 0, 0]
+    PROBLEMS_NUMS = [1, 1, 1]
+    TIME_LIMITS = [6 * 60, 5 * 60, 2 * 60]
+    DISTRIBUTIONS = ['uniform', 'normal', 'exponential']
+    # DISTRIBUTIONS = ['normal']  # , 'exponential']
+
+    experiments = np.array([
+        # {'name': 'milp_simp', 'runner': run_milp_simp},
+        # {'name': 'qp_simp', 'runner': run_qp_simp},
+
+        # {'name': 'milp_weights', 'runner': run_milp_weights},
+        # {'name': 'qp_weights', 'runner': run_qp_weights},
+        # {'name': 'cp_weights', 'runner': run_cp_weights},
+        #
+        # {'name': 'milp_durations', 'runner': run_milp_durations},
+        # {'name': 'qp_durations', 'runner': run_qp_durations},
+
+        {'description': 'deterministic baseline model',
+         'name': 'DET', 'runner': run_cp_simp},
+
+        # Plot 1:
+        {'description': 'Sensitivity analysis buffer time model (param q)',
+         'name': 'BT10', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.1}},
+        {'description': 'Sensitivity analysis buffer time model (param q)',
+         'name': 'BT20', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.2}},
+        {'description': 'Sensitivity analysis buffer time model (param q)',
+         'name': 'BT30', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.3}},
+        {'description': 'Sensitivity analysis buffer time model (param q)',
+         'name': 'BT40', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.4}},
+        {'description': 'Sensitivity analysis buffer time model (param q)',
+         'name': 'BT50', 'runner': run_cp_buffer_times, 'params': {'threshold': 0.5}},
+
+        {'description': 'Sensitivity analysis transitions time model (param q)',
+         'name': 'TR40', 'runner': run_cp_transitions, 'params': {'threshold': 0.4}},
+        {'description': 'Sensitivity analysis transitions time model (param q)',
+         'name': 'TR45', 'runner': run_cp_transitions, 'params': {'threshold': 0.45}},
+        {'description': 'Sensitivity analysis transitions time model (param q)',
+         'name': 'TR50', 'runner': run_cp_transitions, 'params': {'threshold': 0.5}},
+        {'description': 'Sensitivity analysis transitions time model (param q)',
+         'name': 'TR55', 'runner': run_cp_transitions, 'params': {'threshold': 0.55}},
+        {'description': 'Sensitivity analysis transitions time model (param q)',
+         'name': 'TR60', 'runner': run_cp_transitions, 'params': {'threshold': 0.6}},
+
+        # Plot 2:
+        {'description': 'Obj. F. analysis SAA model (RM)',
+         'name': 'STr', 'runner': run_cp_stochastic, 'params': {'N': 30, 'obj': 'avg_rm'}},
+        {'description': 'Obj. F. analysis SAA model (S1)',
+         'name': 'STs1', 'runner': run_cp_stochastic, 'params': {'N': 30, 'obj': 'avg_exp_ovp'}},
+        {'description': 'Obj. F. analysis SAA model (S2)',
+         'name': 'STs2', 'runner': run_cp_stochastic, 'params': {'N': 30, 'obj': 'max_exp_ovp'}},
+        {'description': 'Obj. F. analysis SAA model (additional Obj F 1)',
+         'name': 'STmR', 'runner': run_cp_stochastic, 'params': {'N': 30, 'obj': 'max_rm'}},
+        {'description': 'Obj. F. analysis SAA model (additional Obj F 2)',
+         'name': 'STmS', 'runner': run_cp_stochastic, 'params': {'N': 30, 'obj': 'max_max_ovp'}},
+
+        # Plot 3:
+        {'description': 'Obj. F. analysis Model With Bounded Makespan (RM)',
+         'name': 'MBr', 'runner': run_cp_stochastic_avg_d_makespan_bound,
+         'params': {'N': 30, 'makespan_delta': 5, 'first_runner': run_cp_simp, 'first_runner_params': {},
+                    'first_time_limit': 60, 'obj': 'avg_rm'}},
+        {'description': 'Obj. F. analysis Model With Bounded Makespan (S1)',
+         'name': 'MBs1', 'runner': run_cp_stochastic_avg_d_makespan_bound,
+         'params': {'N': 30, 'makespan_delta': 5, 'first_runner': run_cp_simp, 'first_runner_params': {},
+                    'first_time_limit': 60, 'obj': 'avg_exp_ovp'}},
+        {'description': 'Obj. F. analysis Model With Bounded Makespan (S2)',
+         'name': 'MBs2', 'runner': run_cp_stochastic_avg_d_makespan_bound,
+         'params': {'N': 30, 'makespan_delta': 5, 'first_runner': run_cp_simp, 'first_runner_params': {},
+                    'first_time_limit': 60, 'obj': 'max_exp_ovp'}},
+        {'description': 'Obj. F. analysis Model With Bounded Makespan (additional Obj F 1)',
+         'name': 'MBmR', 'runner': run_cp_stochastic_avg_d_makespan_bound,
+         'params': {'N': 30, 'makespan_delta': 5, 'first_runner': run_cp_simp, 'first_runner_params': {},
+                    'first_time_limit': 60, 'obj': 'max_rm'}},
+        {'description': 'Obj. F. analysis Model With Bounded Makespan (additional Obj F 2)',
+         'name': 'MBmS', 'runner': run_cp_stochastic_avg_d_makespan_bound,
+         'params': {'N': 30, 'makespan_delta': 5, 'first_runner': run_cp_simp, 'first_runner_params': {},
+                    'first_time_limit': 60, 'obj': 'max_max_ovp'}},
+
+        # Plot 4:
+        {'description': 'Obj. F. analysis Model With Bounded Number of Buffer Times (RM)',
+         'name': 'BBr', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 1, 'sum_of_buf': 25, 'obj': 'avg_rm'}},
+        {'description': 'Obj. F. analysis Model With Bounded Number of Buffer Times (S1)',
+         'name': 'BBs1', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 1, 'sum_of_buf': 25, 'obj': 'avg_exp_ovp'}},
+        {'description': 'Obj. F. analysis Model With Bounded Number of Buffer Times (S2)',
+         'name': 'BBs2', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 1, 'sum_of_buf': 25, 'obj': 'max_exp_ovp'}},
+        {'description': 'Obj. F. analysis Model With Bounded Number of Buffer Times (additional Obj F 1)',
+         'name': 'BBmR', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 1, 'sum_of_buf': 25, 'obj': 'max_rm'}},
+        {'description': 'Obj. F. analysis Model With Bounded Number of Buffer Times (additional Obj F 2)',
+         'name': 'BBmS', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 1, 'sum_of_buf': 25, 'obj': 'max_max_ovp'}},
+
+        # Plot 5:
+        {'description': 'Sensitivity analysis SAA model (N)',
+         'name': 'STr2', 'runner': run_cp_stochastic, 'params': {'N': 2, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis SAA model (N)',
+         'name': 'STr10', 'runner': run_cp_stochastic, 'params': {'N': 10, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis SAA model (N)',
+         'name': 'STr30', 'runner': run_cp_stochastic, 'params': {'N': 30, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis SAA model (N)',
+         'name': 'STr50', 'runner': run_cp_stochastic, 'params': {'N': 50, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis SAA model (N)',
+         'name': 'STr100', 'runner': run_cp_stochastic, 'params': {'N': 100, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis SAA model (N)',
+         'name': 'STr150', 'runner': run_cp_stochastic, 'params': {'N': 150, 'obj': 'avg_rm'}},
+
+        # Plot 6:
+        {'description': 'Sensitivity analysis Model With Bounded Number of Buffer Times (|b_j|)',
+         'name': 'BBr1', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 1, 'sum_of_buf': 25, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis Model With Bounded Number of Buffer Times (|b_j|)',
+         'name': 'BBr2', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 2, 'sum_of_buf': 25, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis Model With Bounded Number of Buffer Times (|b_j|)',
+         'name': 'BBr3', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 3, 'sum_of_buf': 25, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis Model With Bounded Number of Buffer Times (|b_j|)',
+         'name': 'BBr4', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 4, 'sum_of_buf': 25, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis Model With Bounded Number of Buffer Times (|b_j|)',
+         'name': 'BBr5', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 5, 'sum_of_buf': 25, 'obj': 'avg_rm'}},
+
+        # {'name': 'SGS_Rand', 'runner': run_sgs_rand},
+        # {'name': 'SGS_SJF', 'runner': run_sgs_sjf},
+        # {'name': 'SGS_SJL', 'runner': run_sgs_sjl},
+    ])
+
+    data = DataForExperiments(NOT_DUMMY_V_NUMS,
+                              MACHINES_NUMS,
+                              FROM_PROBLEM_IDS,
+                              PROBLEMS_NUMS,
+                              TIME_LIMITS,
+                              DISTRIBUTIONS,
+                              experiments)
+
+    gf, jf, of, dt, m_n, t_l = data.from_i_to_problem_data(job_id)
+    run_experiments_for_problem(gf, jf, of, dt, m_n, t_l, experiments, EXECFILE)
+
+
+def cluster_repeat_same_experiments(job_id: int, problem_ids: list[int]):
+    # EXECFILE = '/apps/CPLEX_Studio2211/cpoptimizer/bin/x86-64_linux/cpoptimizer'
+    EXECFILE = None
+    NOT_DUMMY_V_NUMS = [192]
+    MACHINES_NUMS = [10]
+    FROM_PROBLEM_IDS = [0]
+    PROBLEMS_NUMS = [1]
+    TIME_LIMITS = [30 * 60]
+    DISTRIBUTIONS = ['uniform', 'normal', 'exponential']
+
+    experiments = np.array([
+        # Plot 6:
+        {'description': 'Sensitivity analysis Model With Bounded Number of Buffer Times (|b_j|)',
+         'name': 'BBr1', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 1, 'sum_of_buf': 25, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis Model With Bounded Number of Buffer Times (|b_j|)',
+         'name': 'BBr2', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 2, 'sum_of_buf': 25, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis Model With Bounded Number of Buffer Times (|b_j|)',
+         'name': 'BBr3', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 3, 'sum_of_buf': 25, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis Model With Bounded Number of Buffer Times (|b_j|)',
+         'name': 'BBr4', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 4, 'sum_of_buf': 25, 'obj': 'avg_rm'}},
+        {'description': 'Sensitivity analysis Model With Bounded Number of Buffer Times (|b_j|)',
+         'name': 'BBr5', 'runner': run_cp_stochastic_multi_mode_buf,
+         'params': {'N': 30, 'max_b': 5, 'sum_of_buf': 25, 'obj': 'avg_rm'}},
+    ])
+
+    data = DataForExperiments(NOT_DUMMY_V_NUMS,
+                              MACHINES_NUMS,
+                              FROM_PROBLEM_IDS,
+                              PROBLEMS_NUMS,
+                              TIME_LIMITS,
+                              DISTRIBUTIONS,
+                              experiments)
+
+    problem_id = problem_ids[job_id % len(problem_ids)]
+    gf, jf, of, dt, m_n, t_l = data.from_i_to_problem_data(problem_id)
+    print("of", of)
+    of = ".".join(of.split('.')[:-1]) + "_repeated_" + str(job_id // len(problem_ids)) + ".csv"
+    run_experiments_for_problem(gf, jf, of, dt, m_n, t_l, experiments, EXECFILE)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="cluster gives job_id")
+    parser.add_argument("job_id", type=int, help="job_id that will use to start corresponding problem")
+    args = parser.parse_args()
+    job_id = args.job_id
+    main_cluster(job_id)
+
+    problem_ids = [0, 1, 2]
+    for job_id in range(6):
+        cluster_repeat_same_experiments(job_id, problem_ids)
 

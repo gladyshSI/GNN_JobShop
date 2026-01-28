@@ -48,44 +48,44 @@ def add_metrics_to_file(metrics: dict, path_to_file, additional=""):
         f.write(str(metrics) + '\n')
 
 
-def run_cp_simp(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict) -> (Schedule, float, float):
+def run_cp_simp(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict, execfile: str|None) -> (Schedule, float, float):
     makespan = get_makespan_ub(problem)
     longest_ps_dict = problem.get_longest_passes()
     longest_ps_list = [longest_ps_dict[i] for i in range(len(problem.get_all_ids()))]
 
     start_time = time.time()
-    sch, gap = cplex_simple(problem, longest_ps_list, makespan, time_limit=time_limit, log_output=log_output)
+    sch, gap = cplex_simple(problem, longest_ps_list, makespan, time_limit=time_limit, log_output=log_output, execfile=execfile)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
 
 
-def run_cp_weights(problem: Problem, time_limit: int) -> (Schedule, float, float):
+def run_cp_weights(problem: Problem, time_limit: int, execfile: str|None) -> (Schedule, float, float):
     makespan = get_makespan_ub(problem)
     longest_ps_dict = problem.get_longest_passes()
     longest_ps_list = [longest_ps_dict[i] for i in range(len(problem.get_all_ids()))]
 
     start_time = time.time()
-    sch, gap = cplex_weights(problem, longest_ps_list, makespan, time_limit=time_limit, log_output=True)
+    sch, gap = cplex_weights(problem, longest_ps_list, makespan, time_limit=time_limit, log_output=True, execfile=execfile)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
 
 
-def run_cp_precedence_max(problem: Problem, time_limit: int) -> (Schedule, float, float):
+def run_cp_precedence_max(problem: Problem, time_limit: int, execfile: str|None) -> (Schedule, float, float):
     makespan = get_makespan_ub(problem)
     longest_ps_dict = problem.get_longest_passes()
     longest_ps_list = [longest_ps_dict[i] for i in range(len(problem.get_all_ids()))]
 
     start_time = time.time()
     sch, gap = cplex_pg_time_lags_max(problem, longest_ps_list, makespan, p=None, time_limit=time_limit,
-                                      log_output=True)
+                                      log_output=True, execfile=execfile)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
 
 
-def run_qp_simp(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict) -> (Schedule, float, float):
+def run_qp_simp(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict, execfile: str | None) -> (Schedule, float, float):
     makespan = get_makespan_ub(problem)
     longest_ps_dict = problem.get_longest_passes()
     longest_ps_list = [longest_ps_dict[i] for i in range(len(problem.get_all_ids()))]
@@ -155,7 +155,7 @@ def get_buf_from_threshold(init_dur: int, distribution: dict, threshold: float) 
     return new_dur - init_dur
 
 
-def run_cp_buffer_times(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict) -> (Schedule, float, float):
+def run_cp_buffer_times(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict, execfile: str|None) -> (Schedule, float, float):
     # The buffer selection is determined by the threshold probability.
     # The buffer must be such that the probability of exceeding it is less than the threshold probability
     threshold_p = parameters['threshold']
@@ -167,19 +167,19 @@ def run_cp_buffer_times(problem: Problem, time_limit: int, log_output: bool | No
         buffers[t_id] = get_buf_from_threshold(init_dur, distr, threshold_p)
 
     start_time = time.time()
-    sch, gap = cplex_buffer_times(problem, buffers, time_limit=time_limit, log_output=log_output)
+    sch, gap = cplex_buffer_times(problem, buffers, time_limit=time_limit, log_output=log_output, execfile=execfile)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
 
 
-def run_cp_multimode_buf(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict) -> (Schedule, float, float):
+def run_cp_multimode_buf(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict, execfile: str|None) -> (Schedule, float, float):
     # The buffer selection is determined by the threshold probability.
     # The buffer must be such that the probability of exceeding it is less than the threshold probability
     modes = parameters['modes']
 
     start_time = time.time()
-    sch, gap = cplex_multimode_buffer_times(problem, modes, time_limit=time_limit, log_output=log_output)
+    sch, gap = cplex_multimode_buffer_times(problem, modes, time_limit=time_limit, log_output=log_output, execfile=execfile)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
@@ -205,7 +205,7 @@ def find_best_transition_time(first_duration: int,
     return t
 
 
-def run_cp_transitions(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict) -> (Schedule, float, float):
+def run_cp_transitions(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict, execfile: str|None) -> (Schedule, float, float):
     # The buffer selection is determined by the threshold probability.
     # transition between tasks i and j -> t
     # P([sum of new durations] > p_i + t + p_j) <= threshold probability
@@ -230,13 +230,13 @@ def run_cp_transitions(problem: Problem, time_limit: int, log_output: bool | Non
                                                                              threshold_p)
 
     start_time = time.time()
-    sch, gap = cplex_transitions(problem, transitions, time_limit=time_limit, log_output=log_output)
+    sch, gap = cplex_transitions(problem, transitions, time_limit=time_limit, log_output=log_output, execfile=execfile)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
 
 
-def run_cp_combined(pg, t_to_res, time_limit):
+def run_cp_combined(pg, t_to_res, time_limit, execfile: str|None):
     makespan = get_makespan_ub(pg, t_to_res) + 10
     longest_ps_dict = get_longest_ps_dict(pg)
     longest_ps_list = [longest_ps_dict[i] for i in range(len(pg._vertices))]
@@ -245,41 +245,41 @@ def run_cp_combined(pg, t_to_res, time_limit):
     start_time = time.time()
     gap, sch = cplex_combined_trans_pc_max(pg, t_to_res, r_num, longest_ps_list, makespan=makespan,
                                            time_limit=time_limit,
-                                           log_output=True)
+                                           log_output=True, execfile=execfile)
     end_time = time.time()
 
     return gap, sch, (end_time - start_time)
 
 
-def run_cp_stochastic(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict) -> (Schedule, float, float):
+def run_cp_stochastic(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict, execfile: str|None) -> (Schedule, float, float):
     scenarios_num = parameters['N']
     obj = parameters['obj']
     start_time = time.time()
-    sch, gap = cplex_stochastic(problem, obj=obj, scenarios_num=scenarios_num, time_limit=time_limit, log_output=log_output)
+    sch, gap = cplex_stochastic(problem, obj=obj, scenarios_num=scenarios_num, time_limit=time_limit, log_output=log_output, execfile=execfile)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
 
 
-def run_cp_stochastic_avg_delta(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict) -> (Schedule, float, float):
+def run_cp_stochastic_avg_delta(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict, execfile: str|None) -> (Schedule, float, float):
     scenarios_num = parameters['N']
     start_time = time.time()
-    sch, gap = cplex_stochastic_avg_delta(problem, scenarios_num=scenarios_num, time_limit=time_limit, log_output=log_output)
+    sch, gap = cplex_stochastic_avg_delta(problem, scenarios_num=scenarios_num, time_limit=time_limit, log_output=log_output, execfile=execfile)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
 
 
-def run_cp_stochastic_max_delta(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict) -> (Schedule, float, float):
+def run_cp_stochastic_max_delta(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict, execfile: str|None) -> (Schedule, float, float):
     scenarios_num = parameters['N']
     start_time = time.time()
-    sch, gap = cplex_stochastic_max_delta(problem, scenarios_num=scenarios_num, time_limit=time_limit, log_output=log_output)
+    sch, gap = cplex_stochastic_max_delta(problem, scenarios_num=scenarios_num, time_limit=time_limit, log_output=log_output, execfile=execfile)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
 
 
-def run_cp_stochastic_avg_d_makespan_bound(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict) -> (Schedule, float, float):
+def run_cp_stochastic_avg_d_makespan_bound(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict, execfile: str|None) -> (Schedule, float, float):
     first_runner = parameters['first_runner']
     first_runner_params = parameters['first_runner_params']
     first_time_limit = parameters['first_time_limit']
@@ -288,7 +288,7 @@ def run_cp_stochastic_avg_d_makespan_bound(problem: Problem, time_limit: int, lo
     obj = parameters['obj']
 
     # Find opt makespan, using first runner
-    sch, gap, solv_time = first_runner(problem, first_time_limit, log_output, first_runner_params)
+    sch, gap, solv_time = first_runner(problem, first_time_limit, log_output, first_runner_params, execfile=execfile)
     makespan = sch.get_makespan() + makespan_delta
 
     start_time = time.time()
@@ -296,13 +296,14 @@ def run_cp_stochastic_avg_d_makespan_bound(problem: Problem, time_limit: int, lo
                                                      scenarios_num=scenarios_num,
                                                      obj=obj,
                                                      time_limit=time_limit,
-                                                     log_output=log_output)
+                                                     log_output=log_output,
+                                                     execfile=execfile)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
 
 
-def run_cp_stochastic_multi_mode_buf(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict) -> (Schedule, float, float):
+def run_cp_stochastic_multi_mode_buf(problem: Problem, time_limit: int, log_output: bool | None, parameters: dict, execfile: str|None) -> (Schedule, float, float):
     sum_of_buf = parameters['sum_of_buf']
     scenarios_num = parameters['N']
     max_b = parameters['max_b']
@@ -314,7 +315,8 @@ def run_cp_stochastic_multi_mode_buf(problem: Problem, time_limit: int, log_outp
                                                scenarios_num=scenarios_num,
                                                obj=obj,
                                                time_limit=time_limit,
-                                               log_output=log_output)
+                                               log_output=log_output,
+                                               execfile=execfile)
     end_time = time.time()
 
     return sch, gap, (end_time - start_time)
